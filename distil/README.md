@@ -1,6 +1,6 @@
 # Distil — native macOS prototype 0.5
 
-Distil helps you send a model less unnecessary context while keeping what a task needs, and then check whether the answer is still useful. It is an unbranded SwiftUI desktop app. All source is newly written for this project; no company code, logos, assets, accounts or third-party packages are included.
+Distil helps you send a model less unnecessary context while keeping what a task needs, and then check whether the answer is still useful. It is a SwiftUI desktop app whose icon and sidebar mark use the HCG logo (the hackathon organiser’s). All source is newly written for this project; apart from that logo, no company code, logos, assets, accounts or third-party packages are included.
 
 A smaller prompt is not automatically a better prompt. Every number names the counter that produced it. Estimated reductions are never presented as cost savings, keyword matches are never presented as understanding, and answer quality stays "Not evaluated" until you compare real answers.
 

@@ -99,7 +99,7 @@ input[type='range'] { padding: 0; accent-color: var(--cyan); background: transpa
   background: rgba(6, 13, 28, 0.85); backdrop-filter: blur(8px); position: relative; z-index: 20;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
-.logo { color: var(--cyan); font-size: 22px; text-shadow: 0 0 18px rgba(34, 211, 238, 0.6); }
+.logo { width: 34px; height: 34px; flex: none; border-radius: 8px; box-shadow: 0 0 14px rgba(34, 211, 238, 0.25); }
 .brand-name { font-weight: 700; letter-spacing: -0.01em; }
 .brand-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
 .title-input { max-width: 280px; background: transparent; border-color: transparent; font-weight: 600; }

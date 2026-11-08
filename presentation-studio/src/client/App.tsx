@@ -182,9 +182,7 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="logo" aria-hidden>
-            ◆
-          </span>
+          <img className="logo" src="/hcg-mark.png" alt="HCG logo" width={34} height={34} data-testid="hcg-logo" />
           <div>
             <div className="brand-name">Presentation Studio</div>
             <div className="brand-sub">Oslo Sprint</div>

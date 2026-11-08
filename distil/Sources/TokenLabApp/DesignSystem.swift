@@ -264,9 +264,11 @@ struct DSSidebar<ID: Hashable, Footer: View>: View {
     let groups: [DSSidebarGroup<ID>]
     @Binding var selection: ID
     var topInset: CGFloat = 0
-    /// Product name and descriptor shown as text at the top (no logo).
+    /// Product name and descriptor shown at the top.
     var brandName: String? = nil
     var brandTagline: String? = nil
+    /// HCG logo mark shown beside the name (`BrandAssets.hcgMark`); omitted when nil.
+    var brandMark: NSImage? = nil
     @ViewBuilder var footer: Footer
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -278,10 +280,19 @@ struct DSSidebar<ID: Hashable, Footer: View>: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if let brandName {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(brandName).font(DS.Typeface.brand).tracking(2.2).foregroundStyle(DS.textPrimary)
-                            if let brandTagline {
-                                Text(brandTagline).font(DS.Typeface.label).textCase(.uppercase).tracking(1.3)
-                                    .foregroundStyle(DS.textTertiary)
+                            HStack(alignment: .center, spacing: 10) {
+                                if let brandMark {
+                                    Image(nsImage: brandMark).resizable().interpolation(.high)
+                                        .frame(width: 34, height: 34)
+                                        .accessibilityLabel("HCG logo")
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(brandName).font(DS.Typeface.brand).tracking(2.2).foregroundStyle(DS.textPrimary)
+                                    if let brandTagline {
+                                        Text(brandTagline).font(DS.Typeface.label).textCase(.uppercase).tracking(1.3)
+                                            .foregroundStyle(DS.textTertiary)
+                                    }
+                                }
                             }
                             Rectangle().fill(DS.accent.opacity(0.35)).frame(width: 28, height: 2).padding(.top, 6)
                         }
@@ -540,4 +551,13 @@ struct DSStatusCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsPanel(padding: 10, raised: true)
     }
+}
+
+
+/// The HCG logo mark. The build script copies `Resources/HCGMark.png` into the app bundle's
+/// Contents/Resources; when the app runs outside a bundle (`swift run`) it is nil and the
+/// sidebar shows the product name alone.
+enum BrandAssets {
+    @MainActor static let hcgMark: NSImage? = Bundle.main.url(forResource: "HCGMark", withExtension: "png")
+        .flatMap { NSImage(contentsOf: $0) }
 }
