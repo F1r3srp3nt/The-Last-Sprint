@@ -60,6 +60,22 @@ Open `build/Relay.app` and go to **Settings**. "Readiness" is the panel at the t
 - The "About the default" box explains that new setups use Flash v2.5 and why. It also says availability, languages and credit use depend on ElevenLabs and your account or plan, and that Relay never switches models by itself.
 - Choose an unavailable model under Advanced (e.g. `eleven_nonexistent`) and run *Test voice*. An error is shown and the model is **not** changed automatically.
 
+### Wybe Night Shift (Settings › Wybe Night Shift)
+
+None of these steps starts a shift. Steps W4–W7 need a real team key; skip them without one.
+
+| # | Do | Expect |
+|---|---|---|
+| W1 | Open Settings and scroll to *Wybe Night Shift*. | Readiness shows four rows: Key saved, Connection verified, Protocol discovered, Live runner ready — all not done. Step 1 explains that the event code is for the registration page only. |
+| W2 | Paste a made-up event code (e.g. `ABC123`) into the team-key field and *Save to Keychain*. | Not saved. The message says team keys start with “ns_” and the event code is only for the registration page. |
+| W3 | Paste a key starting with `ns_` and save. | Key saved: done. Connection verified: still not done. The field shows `ns_•••••••• (hidden)` with no key characters. Keychain Access shows an item for service `com.oslosprint.relay.wybe`; the ElevenLabs item is unchanged. |
+| W4 | *Check connection*. | The service's reply is shown. If it equals the anonymous greeting, the text says this does not prove the key is accepted. A wrong key shows “refused this team key (HTTP 401)”. |
+| W5 | Start *Check connection*, then *Replace…* the key before it finishes (use a slow network or press quickly). | The result is discarded (Activity: “Discarded a connection result …”); Connection verified stays not done. |
+| W6 | Record a help request copied from the service's own instructions, with its source, then *Discover protocol*. | Sent once. The answer is shown verbatim; Protocol discovered: done; Live runner ready: not done, “No reviewed command mapping…”. |
+| W7 | Try to record a help request containing “start” or no “help”. | Not recorded, with the reason. |
+| W8 | *Remove* the Wybe key. | All four rows go back to not done. The ElevenLabs key is still saved. |
+| W9 | Activity › *Export…*. | No `ns_` key anywhere in the file. |
+
 ## C. What to report back
 
 Send `relay/build/verify-macos.log` and fill in:

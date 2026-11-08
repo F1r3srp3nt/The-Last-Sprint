@@ -48,10 +48,10 @@ Real window captures of the packaged `Relay.app`, taken by the Relay workflow on
 
 | Part | State |
 |---|---|
-| Core engine (tasks, log, redaction, runner, training) | Builds; 68 XCTests pass on Linux (Swift 6.0.3) |
+| Core engine (tasks, log, redaction, runner, training) | Builds; 134 XCTests pass on Linux (Swift 6.0.3) |
 | `relay-runner` CLI | Builds and runs on Linux; should be identical on macOS |
 | Warehouse training (text) | Complete and deterministic, with a **synthetic** procedure in en / nb / pl |
-| Wybe Night Shift | **Simulation only.** The live protocol hasn't been obtained, and live mode sends nothing |
+| Wybe Night Shift | Simulation runs. Live connection setup (team key in its own Keychain entry, connection check, help discovery) and a bounded live adapter are written and tested against a scripted transport, **never with a real key**. No command mapping exists, so the live runner refuses to start ([docs/WYBE.md](docs/WYBE.md)) |
 | ElevenLabs STT / TTS adapters | Implemented and tested against a fake transport, and checked against elevenlabs.io docs (2026-11-07). **Never called the real service** (no key) |
 | macOS SwiftUI app | Compiles on GitHub's macOS 15 runner, which also launches it for the [screenshots](#screenshots). **Not yet tried by a person on a Mac**; run `scripts/verify-macos.sh` |
 
@@ -59,7 +59,7 @@ Real window captures of the packaged `Relay.app`, taken by the Relay workflow on
 
 `.github/workflows/relay.yml` runs on pull requests and pushes to `main` that touch `relay/`:
 
-- **Linux** (`swift:6.0-noble`): build, the 68 tests, runner smoke tests (simulation only, no
+- **Linux** (`swift:6.0-noble`): build, the 134 tests, runner smoke tests (simulation only, no
   network) and the credential check.
 - **macOS** (`macos-15`): build, including the SwiftUI app target, plus tests and the
   `Relay.app` bundle.
@@ -117,7 +117,9 @@ swift run relay-runner wybe-sim --shifts 10 --faults typical      # SIMULATED sc
 swift run relay-runner wybe-sim --seed 7 --faults harsh --verbose --json runs/sim.json
 swift run relay-runner wybe-sim --stop-after 5                    # demonstrates the stop control
 swift run relay-runner wybe-sim --stop-file /tmp/relay.stop       # touch the file to stop
-swift run relay-runner wybe-live                                  # explains what's missing; sends nothing; exit 2
+swift run relay-runner wybe-live                                  # readiness summary; sends nothing; exit 2
+swift run relay-runner wybe-connect                               # WYBE_TEAM_KEY set: one authenticated GET / (no shift)
+swift run relay-runner wybe-help --method … --path … --source …   # sends the recorded help request once
 swift run relay-runner warehouse --lang pl                        # interactive text training
 ./scripts/demo-warehouse.sh                                       # scripted training session
 swift run relay-runner export-procedure > my-procedure.json
@@ -134,7 +136,7 @@ Ctrl-C during `wybe-sim` stops before the next action. Pressing it a second time
 | **Warehouse Training** | Step card with critical warnings first, a language switcher, *I understand the safety warning* (required before *Next*), questions answered with the supporting instruction quoted, clarification, and escalation. |
 | **Wybe Runner** | Seed, shift count, fault level, Run / Stop. Shows the latest observation, the current decision rationale, the full action history with attempts, and per-shift and average **SIMULATED** scores. Live mode is locked. |
 | **Activity** | Redacted, append-only event log with filters and JSON Lines export. |
-| **Settings** | Guided setup. A readiness panel shows five separate checks (key saved, account check, speech input tested, speech output tested, microphone permission). Numbered ElevenLabs steps cover the API key (Keychain: save, replace, remove), voice, microphone and speech input, and models, each with buttons that open the right dashboard page, explicit test buttons and expandable *Where do I find this?* / *Troubleshooting* help. It also explains reasoning honestly and has a Wybe registration link with an integration checklist. |
+| **Settings** | Guided setup. A readiness panel shows five separate checks (key saved, account check, speech input tested, speech output tested, microphone permission). Numbered ElevenLabs steps cover the API key (Keychain: save, replace, remove), voice, microphone and speech input, and models, each with buttons that open the right dashboard page, explicit test buttons and expandable *Where do I find this?* / *Troubleshooting* help. It also explains reasoning honestly. A Wybe section separates registration (event code, on the organisers' page) from the team key (masked field; save, replace, remove; its own Keychain entry), checks the connection, discovers the protocol through a recorded help request, and shows four separate facts: key saved, connection verified, protocol discovered, live runner ready. |
 
 Text-only fallback: with no ElevenLabs key, everything except push-to-talk and spoken replies
 works. The status pills read "Not configured — text only".
@@ -148,16 +150,19 @@ works. The status pills read "Not configured — text only".
   not Holio documentation.
 - **Real but unexercised:** the ElevenLabs HTTP calls. They will run with your key, but have
   not run yet.
-- **Not implemented, by design:** the live Wybe adapter, a Holio integration, and any
-  language-model reasoning.
+- **Real but unexercised:** the Wybe connection check and help discovery. They will run with
+  a team key, but have not run yet.
+- **Not implemented, by design:** a Wybe command mapping and live policy (they need the real
+  help answer), a Holio integration, and any language-model reasoning.
 
 ## Still needed from outside
 
 1. **Wybe:** a team key from registration at `https://nightshift-board.wybe.me/join` (your call;
-   Relay has registered nothing). The organisers' key card gives the endpoint
-   (`https://nightshift.wybe.me/`) and `Authorization: Bearer <key>`. The JSON format, commands,
-   observations, retry safety, limits and scoring must then be discovered with the key, and
-   **the live adapter still has to be written**. See `docs/WYBE.md` and the checklist in Settings.
+   Relay has registered nothing; the event code is used only there). Save it in Settings › Wybe
+   Night Shift, then Check connection. The form of the help request, the commands,
+   observations, retry safety, limits and scoring must then be learned from the service, and a
+   **reviewed command mapping and live policy still have to be written** before any live run.
+   See `docs/WYBE.md`.
 2. **ElevenLabs:** your API key (Settings, step 1, with the Speech to Text and Text to Speech
    permissions) and a voice ID (step 2). Instructions were checked against elevenlabs.io on
    2026-11-07; see `docs/ELEVENLABS.md`.
@@ -170,7 +175,7 @@ The full step-by-step sequence for the guided speech setup is in `docs/MACOS-ACC
 key saving, account check, voice and microphone tests, cancel/restart, changes while a request is
 pending, persistence across restarts, and the minimum window width. The short list:
 
-- [ ] `./scripts/test.sh` passes: 68 tests, and the `Relay` app target compiles.
+- [ ] `./scripts/test.sh` passes: 134 tests, and the `Relay` app target compiles.
 - [ ] `./scripts/build-app.sh && open build/Relay.app` opens a dark window with six sections.
 - [ ] Assistant, typed `start`: the card shows Heard / Understood / Plan / Attempted / Result, and Step 1/7 has the SAFETY line first.
 - [ ] `next` asks for confirmation. `understood` and then `next` show Step 2/7.

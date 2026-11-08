@@ -58,6 +58,7 @@ public final class Redactor: @unchecked Sendable {
         let k = key.lowercased()
         return k == "xi-api-key" || k == "authorization" || k.contains("api_key") || k.contains("apikey")
             || k.contains("api-key") || k.contains("token") || k.contains("secret") || k.contains("password")
+            || k.contains("team-key") || k.contains("team_key") || k.contains("teamkey")
     }
 
     private struct Rule {
@@ -85,6 +86,8 @@ public final class Redactor: @unchecked Sendable {
                  "$1" + placeholder),
             // ElevenLabs-style keys ("sk_" prefix followed by a long token)
             rule(#"\bsk_[A-Za-z0-9]{16,}\b"#, placeholder),
+            // Wybe Night Shift team keys ("ns_" prefix, shown on the organisers' registration page)
+            rule(#"\bns_[A-Za-z0-9_-]{8,}"#, placeholder),
         ]
     }()
 }

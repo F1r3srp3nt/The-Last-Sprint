@@ -35,9 +35,10 @@ struct WybeRunnerView: View {
                 Image(systemName: "lock.fill").foregroundStyle(Theme.warning)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Live mode unavailable").font(.callout.weight(.semibold))
-                    Text("The real Wybe command list, endpoints and scoring have not been obtained. Relay will not guess them. "
-                         + "Team registration via the organisers' join page is needed first (see docs/WYBE.md).")
+                    Text((model.wybeReadiness.liveRunnerBlocker ?? "")
+                         + " Set up the connection in Settings › Wybe Night Shift. Relay never guesses commands, and nothing on this page talks to the live service.")
                         .font(.caption).foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

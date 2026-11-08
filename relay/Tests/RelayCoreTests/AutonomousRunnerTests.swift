@@ -311,15 +311,4 @@ final class AutonomousRunnerTests: XCTestCase {
         let performCallCount12 = await sim.performCallCount
         XCTAssertEqual(performCallCount12, 0)
     }
-
-    func testLiveAdapterWithoutContractSendsNothingAndReportsNoScore() async {
-        let runner = AutonomousRunner(adapter: LiveNightShiftAdapter(), policy: SimulatedShiftPolicy(),
-                                      configuration: RunnerConfiguration(expectedMode: .live, allowedActions: []),
-                                      clock: ManualClock(), log: InMemoryEventLog(redactor: Redactor()), stop: StopSignal())
-        let report = await runner.run()
-        XCTAssertEqual(report.mode, .live)
-        XCTAssertTrue(report.actions.isEmpty)
-        XCTAssertNil(report.score, "no live score unless the real service reports one")
-        XCTAssertTrue(report.stopReason.contains("Contract unavailable"))
-    }
 }
