@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { ServerConfig } from './config';
 import { ApiError } from './errors';
+import { keyHint } from './hints';
 import { createAnthropicGenerator, mapAnthropicError, type Generator } from './generation';
 import { ElevenLabsClient, type FetchLike } from './elevenlabs';
 import type { ProviderStatus } from '../src/shared/apiTypes';
@@ -90,7 +91,7 @@ export function createApp(config: ServerConfig, deps: AppDeps = {}) {
   // ---- Generation ---------------------------------------------------------
   const requireGenerator = () => {
     if (!generator) {
-      throw new ApiError(503, 'generation_not_configured', 'No AI provider is configured.', false, 'Use template mode, or add ANTHROPIC_API_KEY to presentation-studio/.env and restart the server.');
+      throw new ApiError(503, 'generation_not_configured', 'No AI provider is configured.', false, `Use template mode, or: ${keyHint('ANTHROPIC_API_KEY', 'add')}`);
     }
     return generator;
   };

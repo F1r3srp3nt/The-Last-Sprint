@@ -1,0 +1,48 @@
+# Desktop packaging (electron-builder). See docs/DESKTOP.md.
+appId: com.oslosprint.presentationstudio
+productName: Presentation Studio
+copyright: Oslo Sprint
+directories:
+  output: release
+  buildResources: desktop/resources
+# Only the built files are shipped. The backend's dependencies are bundled into
+# build/desktop/backend.cjs, so no node_modules folder goes into the app.
+files:
+  - build/desktop/**
+  - dist/**
+  - package.json
+  - "!node_modules/**"
+  - "!**/*.map"
+extraMetadata:
+  main: build/desktop/main.cjs
+asar: true
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+includePdb: false
+# Fuses are flipped in desktop/build/after-pack.cjs, followed by ad-hoc signing on macOS
+# (flipping fuses changes the binary, so it must happen before the signature is made).
+afterPack: desktop/build/after-pack.cjs
+publish: null
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.productivity
+  # No Developer ID in this repository: the app is ad-hoc signed in after-pack.cjs.
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  minimumSystemVersion: "12.0"
+  extendInfo:
+    NSMicrophoneUsageDescription: Presentation Studio records your spoken brief only while you press Record.
+dmg:
+  artifactName: Presentation-Studio-${version}-${arch}.dmg
+  writeUpdateInfo: false
+
+# Linux is used only to build and test the app in CI and containers; it is not a release target.
+linux:
+  target: [dir]
+  executableName: presentation-studio
+  category: Office

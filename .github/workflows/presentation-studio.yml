@@ -23,6 +23,10 @@ defaults:
   run:
     working-directory: presentation-studio
 
+env:
+  # The web jobs don't need the Electron binary; the desktop jobs download it explicitly.
+  ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
 jobs:
   checks:
     name: Type-check, unit/API tests, build
@@ -79,5 +83,93 @@ jobs:
         with:
           name: presentation-studio-e2e
           path: presentation-studio/test-output/e2e
+          retention-days: 14
+          if-no-files-found: ignore
+
+  desktop-linux:
+    name: Desktop app — package and test (Linux, packaged build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: checks
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: presentation-studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: npm ci
+      - name: Display server, Chromium sandbox and export validator
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends xvfb
+          # Ubuntu 24.04 restricts unprivileged user namespaces, which Chromium's sandbox needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          python -m pip install --quiet python-pptx==1.0.2
+      - name: Playwright (drives the packaged app over CDP; no browser download needed)
+        run: npx playwright --version
+      - name: Package (unpacked Linux app)
+        run: npm run desktop:pack
+      - name: Packaged app end-to-end test
+        run: npm run desktop:test
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: presentation-studio-desktop-linux-e2e
+          path: presentation-studio/test-output/desktop-e2e
+          retention-days: 14
+          if-no-files-found: ignore
+
+  desktop-macos:
+    name: Desktop app — macOS Apple Silicon .app + DMG
+    runs-on: macos-15
+    timeout-minutes: 40
+    needs: checks
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "0"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: presentation-studio/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Build .app and DMG (arm64, ad-hoc signed)
+        run: npm run desktop:dist:mac
+      - name: Inspect the bundle
+        run: |
+          APP="release/mac-arm64/Presentation Studio.app"
+          file "$APP/Contents/MacOS/Presentation Studio"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E "Signature|Identifier"
+          plutil -p "$APP/Contents/Info.plist" | grep -E "CFBundleIdentifier|NSMicrophoneUsageDescription|LSMinimumSystemVersion"
+          npx @electron/fuses read --app "$APP"
+          ls -l release/*.dmg
+          hdiutil imageinfo release/*.dmg | grep -E "Format|Checksum Type" | head -3
+      - name: Packaged app end-to-end test
+        run: npm run desktop:test -- --app "release/mac-arm64/Presentation Studio.app"
+      - name: Upload DMG (build artifact, not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Presentation-Studio-macOS-arm64-dmg
+          path: presentation-studio/release/*.dmg
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: presentation-studio-desktop-macos-e2e
+          path: presentation-studio/test-output/desktop-e2e
           retention-days: 14
           if-no-files-found: ignore
