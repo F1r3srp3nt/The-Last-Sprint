@@ -154,7 +154,7 @@ struct SettingsView: View {
                         }
                         LabeledContent("Project file schema", value: "\(ProjectDocument.currentSchemaVersion) (reads 1–\(ProjectDocument.currentSchemaVersion))")
                         LabeledContent("Selection engine", value: SelectionReport.currentEngineVersion)
-                        SettingsFootnote("Distil is the working product name and the executable name. Package and module names (TokenLab*) and the bundle identifier are unchanged, so preferences, imported tokenizer files and saved projects carry over. No company identity, logos, accounts or third-party code are included.")
+                        SettingsFootnote("Distil is the working product name and the executable name. Package and module names (TokenLab*) and the bundle identifier are unchanged, so preferences, imported tokenizer files and saved projects carry over. The app icon and sidebar mark use the HCG logo (the hackathon organiser’s); apart from that, no company identity, logos, accounts or third-party code are included.")
                     }
                 }
             }

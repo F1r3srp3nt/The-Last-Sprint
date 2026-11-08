@@ -70,7 +70,7 @@ struct ContentView: View {
 
     private var sidebar: some View {
         DSSidebar(groups: sidebarGroups, selection: sectionSelection, topInset: DS.Space.s,
-                  brandName: "DISTIL", brandTagline: "Context selection lab") {
+                  brandName: "DISTIL", brandTagline: "Context selection lab", brandMark: BrandAssets.hcgMark) {
             DSStatusCard(rows: [
                 DSStatusRow(label: "Project", value: store.hasUnsavedChanges ? "Unsaved changes" : "Saved",
                             systemImage: store.hasUnsavedChanges ? "pencil.circle" : "checkmark.circle",

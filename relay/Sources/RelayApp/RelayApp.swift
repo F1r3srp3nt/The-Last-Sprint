@@ -82,7 +82,8 @@ struct ContentView: View {
         GeometryReader { proxy in
             HStack(spacing: 0) {
                 DSSidebar(groups: [DSSidebarGroup(title: "Workspace", items: AppSection.allCases.map(item))],
-                          selection: $selection, topInset: 30, brandName: "RELAY", brandTagline: "Challenge assistant") {
+                          selection: $selection, topInset: 30, brandName: "RELAY", brandTagline: "Challenge assistant",
+                          brandMark: BrandAssets.hcgMark) {
                     sidebarFooter
                 }
                 .frame(width: Self.sidebarWidth(stored: sidebarWidth, windowWidth: proxy.size.width))

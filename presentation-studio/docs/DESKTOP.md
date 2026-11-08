@@ -88,6 +88,9 @@ The web scripts (`npm run dev`, `npm start`, `npm test`, `npm run test:e2e`) are
 
 ## Packaging for macOS (Apple Silicon)
 
+The app icon is the HCG logo: `desktop/resources/icon.icns` (macOS) and `icon.png`, generated with
+the in-app mark and favicon by `docs/assets/hcg/make_hcg_assets.py` at the repository root.
+
 On a Mac with Apple Silicon (or any Mac with Xcode command line tools):
 
 ```bash
@@ -140,6 +143,5 @@ hooks give nothing to anyone who doesn't already control that account.
 ## Not done yet
 
 - Developer ID signing and notarisation (needs an Apple Developer account).
-- An app icon (the default Electron icon is used).
 - Windows and Linux installers (Linux is packaged only for testing).
 - Automatic updates.
