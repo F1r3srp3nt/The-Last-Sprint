@@ -200,12 +200,14 @@ try {
   });
 
   await step('backend runs in its own process and refuses requests without the launch token', async () => {
+    // The window can load before the backend has started. A request through the app waits for
+    // the backend to be ready, so make it first; only then is the port in main.log.
+    const viaApp = await page.evaluate(async () => (await fetch('/api/status')).status);
+    assert.equal(viaApp, 200);
     const m = /backend ready on 127\.0\.0\.1:(\d+)/.exec(mainLog());
     assert.ok(m, 'main.log reports the backend port');
     const direct = await fetch(`http://127.0.0.1:${m[1]}/api/status`);
     assert.equal(direct.status, 403);
-    const viaApp = await page.evaluate(async () => (await fetch('/api/status')).status);
-    assert.equal(viaApp, 200);
   });
 
   await step('import PNG, JPEG and WebP images', async () => {
