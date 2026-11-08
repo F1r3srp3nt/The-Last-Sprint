@@ -31,8 +31,8 @@ Real window captures of the packaged `Distil.app`, taken by the Distil workflow 
 </details>
 
 <sub>**Screenshot provenance:**
-- Source: Distil workflow [run 42444109110](https://github.com/F1r3srp3nt/Oslo-Sprint/actions/runs/42444109110) on `main` at commit `4b0b30bd8f600a59b5a0816f8e75c5a48cc4ec30`, which includes the latest Distil code change (`daf6daa`, PR #11).
-- Captured on 8 November 2026 (about 03:48 UTC). The app is version 0.5.0, and its Build card shows `4b0b30b`.
+- Source: Distil workflow [run 42517732768](https://github.com/F1r3srp3nt/The-Last-Sprint/actions/runs/42517732768) on `main` at commit `be7808f6f165544f8f8a9737d0905ee237643873`, which includes the HCG logo as the app icon and sidebar mark (The-Last-Sprint PR #5).
+- Captured on 8 November 2026 (about 20:04 UTC). The app is version 0.5.0, and its Build card shows `be7808f`.
 - The runner's screen is 1024×768, so the window is close to its minimum size.
 - The images are unedited copies of the CI artifact.</sub>
 
