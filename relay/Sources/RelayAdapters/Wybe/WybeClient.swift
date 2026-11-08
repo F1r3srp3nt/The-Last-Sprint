@@ -123,8 +123,13 @@ public final class WybeClient: Sendable {
               !request.path.contains("#"), !request.path.contains("..") else {
             throw WybeFailure.invalidRequest("path must be relative to \(endpoint.absoluteString)")
         }
-        guard let url = URL(string: String(request.path.dropFirst()), relativeTo: endpoint)?.absoluteURL,
-              url.scheme == "https", url.host == endpoint.host else {
+        // Built from the endpoint's own components so the host can't change. (URL(string: "",
+        // relativeTo:) is nil on Apple platforms, which made "/" unreachable there.)
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: true)
+        components?.path = request.path
+        components?.query = nil
+        components?.fragment = nil
+        guard let url = components?.url, url.scheme == "https", url.host == endpoint.host else {
             throw WybeFailure.invalidRequest("requests may only go to \(endpoint.host ?? "the endpoint")")
         }
         if let body = request.body, String(decoding: body, as: UTF8.self).contains(key) {

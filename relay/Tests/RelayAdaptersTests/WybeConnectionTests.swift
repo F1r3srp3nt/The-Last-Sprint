@@ -125,6 +125,13 @@ final class WybeClientTests: XCTestCase {
         XCTAssertFalse(request.url!.absoluteString.contains(fakeTeamKey), "the key is never in the URL")
     }
 
+    func testRequestURLsStayOnTheEndpoint() throws {
+        let client = wybeClient(ScriptedTransport([]))
+        XCTAssertEqual(try client.build(.root).url?.absoluteString, "https://nightshift.wybe.me/")
+        XCTAssertEqual(try client.build(WybeRequest(method: .get, path: "/a/b-c_d.e")).url?.absoluteString,
+                       "https://nightshift.wybe.me/a/b-c_d.e")
+    }
+
     func testMissingKeySendsNothing() async {
         let transport = ScriptedTransport([])
         let result = await wybeClient(transport, key: nil).checkConnection()

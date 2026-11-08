@@ -48,7 +48,7 @@ Real window captures of the packaged `Relay.app`, taken by the Relay workflow on
 
 | Part | State |
 |---|---|
-| Core engine (tasks, log, redaction, runner, training) | Builds; 134 XCTests pass on Linux (Swift 6.0.3) |
+| Core engine (tasks, log, redaction, runner, training) | Builds; 135 XCTests pass on Linux (Swift 6.0.3) |
 | `relay-runner` CLI | Builds and runs on Linux; should be identical on macOS |
 | Warehouse training (text) | Complete and deterministic, with a **synthetic** procedure in en / nb / pl |
 | Wybe Night Shift | Simulation runs. Live connection setup (team key in its own Keychain entry, connection check, help discovery) and a bounded live adapter are written and tested against a scripted transport, **never with a real key**. No command mapping exists, so the live runner refuses to start ([docs/WYBE.md](docs/WYBE.md)) |
@@ -59,7 +59,7 @@ Real window captures of the packaged `Relay.app`, taken by the Relay workflow on
 
 `.github/workflows/relay.yml` runs on pull requests and pushes to `main` that touch `relay/`:
 
-- **Linux** (`swift:6.0-noble`): build, the 134 tests, runner smoke tests (simulation only, no
+- **Linux** (`swift:6.0-noble`): build, the 135 tests, runner smoke tests (simulation only, no
   network) and the credential check.
 - **macOS** (`macos-15`): build, including the SwiftUI app target, plus tests and the
   `Relay.app` bundle.
@@ -175,7 +175,7 @@ The full step-by-step sequence for the guided speech setup is in `docs/MACOS-ACC
 key saving, account check, voice and microphone tests, cancel/restart, changes while a request is
 pending, persistence across restarts, and the minimum window width. The short list:
 
-- [ ] `./scripts/test.sh` passes: 134 tests, and the `Relay` app target compiles.
+- [ ] `./scripts/test.sh` passes: 135 tests, and the `Relay` app target compiles.
 - [ ] `./scripts/build-app.sh && open build/Relay.app` opens a dark window with six sections.
 - [ ] Assistant, typed `start`: the card shows Heard / Understood / Plan / Attempted / Result, and Step 1/7 has the SAFETY line first.
 - [ ] `next` asks for confirmation. `understood` and then `next` show Step 2/7.
