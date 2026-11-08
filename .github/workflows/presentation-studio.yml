@@ -142,8 +142,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: presentation-studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Install
         run: npm ci
+      - name: Export validator (python-pptx)
+        run: |
+          python -m pip install --quiet python-pptx==1.0.2
+          python -c "import pptx; print('python-pptx', pptx.__version__)"
       - name: Build .app and DMG (arm64, ad-hoc signed)
         run: npm run desktop:dist:mac
       - name: Inspect the bundle
