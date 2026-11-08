@@ -748,26 +748,335 @@ private struct ReasoningPanel: View {
 
 // MARK: - Wybe Night Shift
 
+/// Wybe setup, in four steps that are kept apart: register (event code, on the organisers' page),
+/// save the team key, check the connection, discover the protocol through help.
 private struct WybePanel: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            SetupGroupHeader(title: "Wybe Night Shift",
+                             detail: "Live challenge connection. Every request here is read-only and starts only from a button; none starts a shift.")
+            WybeReadinessPanel()
+            WybeRegistrationStep()
+            WybeKeyStep()
+            WybeDiscoveryStep()
+            WybeChecklistPanel()
+        }
+    }
+}
+
+private struct WybeReadinessPanel: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        Panel(padding: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Wybe readiness").font(.headline)
+                ForEach(model.wybeReadiness.stages) { stage in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: symbol(stage.state)).foregroundStyle(color(stage.state))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(stage.title).font(.callout.weight(.medium))
+                            Text(stage.detail).font(.caption).foregroundStyle(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func symbol(_ state: WybeReadiness.StageState) -> String {
+        switch state {
+        case .done: return "checkmark.circle.fill"
+        case .inProgress: return "clock"
+        case .attention: return "exclamationmark.triangle.fill"
+        case .notYet: return "circle"
+        }
+    }
+
+    private func color(_ state: WybeReadiness.StageState) -> Color {
+        switch state {
+        case .done: return Theme.success
+        case .inProgress: return Theme.accent
+        case .attention: return Theme.danger
+        case .notYet: return Theme.textSecondary
+        }
+    }
+}
+
+private struct WybeRegistrationStep: View {
+    var body: some View {
+        SetupStep(number: 1, title: "Register the team (event code)",
+                  enables: "Registration gives the team its key. The event code is used only here, on the organisers' page; Relay never asks for it.",
+                  status: "On the organisers' page", statusColor: Theme.accent) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(WybeIntegration.credentialsExplained.enumerated()), id: \.offset) { _, line in
+                    Label(line, systemImage: "info.circle").font(.callout).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            AdaptiveRow { LinkButton(title: "Open challenge registration", url: ProviderLinks.wybeRegistration) }
+            Instructions(lines: WybeIntegration.registrationSteps)
+        }
+    }
+}
+
+private struct WybeKeyStep: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var keyEntry = ""
+    @State private var replacing = false
+    @State private var keyError: String?
+    @State private var confirmRemove = false
+
+    private var status: (String, Color) {
+        let r = model.wybeReadiness
+        if !r.keySaved { return ("Missing", Theme.textSecondary) }
+        switch r.connection {
+        case .passed: return ("Saved · connection verified", Theme.success)
+        case .failed: return ("Saved · check failed", Theme.danger)
+        case .checking: return ("Saved · checking", Theme.accent)
+        case .notChecked: return ("Saved · not verified", Theme.warning)
+        }
+    }
+
+    var body: some View {
+        SetupStep(number: 2, title: "Team key",
+                  enables: "Sent to \(WybeIntegration.endpoint) as “Authorization: Bearer <key>”. Stored in its own Keychain entry, separate from the ElevenLabs key.",
+                  status: status.0, statusColor: status.1) {
+            keyEntryArea
+            if model.wybeReadiness.keySaved {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    AdaptiveRow {
+                        Button("Check connection") { model.checkWybeConnection() }
+                            .disabled(model.wybeReadiness.connection.isChecking || model.wybeReadiness.discovery.isChecking)
+                        if model.wybeReadiness.connection.isChecking {
+                            Button("Cancel") { model.cancelWybeCheck() }
+                        }
+                        Text("Sends one GET / with the key — the only request whose form has been observed. It does not start a shift.")
+                            .font(.caption).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    connectionResult
+                }
+            }
+            HelpDisclosure(title: "Troubleshooting", symbol: "wrench.and.screwdriver") {
+                Text("“Refused this team key” (HTTP 401): the key is wrong or incomplete. The event code is not the key. An organiser at the venue can issue a new key; then use Replace.")
+                Text("“Refused access; the cause is not stated” (HTTP 403): the key may be wrong or the team may not be approved yet. Relay does not guess which; ask an organiser.")
+                Text("“Unexpected format”: the answer was not JSON with a boolean “ok”, the only format observed. Nothing was assumed from it.")
+                Text("“No answer within 10 seconds”: Relay cannot tell whether the request arrived. The check is read-only, so trying again later is safe.")
+            }
+        }
+        .confirmationDialog("Remove the Wybe team key from the Keychain?", isPresented: $confirmRemove) {
+            Button("Remove key", role: .destructive) { model.removeWybeKey(); replacing = false }
+        } message: {
+            Text("Relay stops talking to the Wybe endpoint until a key is saved again. The ElevenLabs key is not affected.")
+        }
+    }
+
+    @ViewBuilder private var keyEntryArea: some View {
+        if model.wybeReadiness.keySaved && !replacing {
+            AdaptiveRow {
+                Label("Stored in Keychain: \(model.wybeKeyDisplay)", systemImage: "key.fill").font(.callout.monospaced())
+                Button("Replace…") { replacing = true; keyError = nil }
+                Button("Remove", role: .destructive) { confirmRemove = true }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                AdaptiveRow {
+                    SecureField(model.wybeReadiness.keySaved ? "Paste the new team key" : "Paste the team key (starts with ns_)", text: $keyEntry)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 220, maxWidth: 380)
+                        .onSubmit(save)
+                    Button("Save to Keychain", action: save)
+                        .buttonStyle(.dsPrimary)
+                        .disabled(keyEntry.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if replacing {
+                        Button("Cancel") { replacing = false; keyEntry = ""; keyError = nil }
+                    }
+                }
+                if let keyError {
+                    Text(keyError).font(.caption).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Saving stores the key; it does not check it. Use Check connection.")
+                    .font(.caption).foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder private var connectionResult: some View {
+        switch model.wybeReadiness.connection {
+        case let .passed(report, _):
+            VStack(alignment: .leading, spacing: 4) {
+                Label(report.detail, systemImage: "checkmark.seal").font(.callout).foregroundStyle(Theme.success)
+                    .fixedSize(horizontal: false, vertical: true)
+                ServiceText(title: "The service said", text: report.resultText)
+            }
+        case let .failed(problem, _):
+            WybeProblemView(problem: problem)
+        case .checking:
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Checking…").font(.callout) }
+        case .notChecked:
+            EmptyView()
+        }
+    }
+
+    private func save() {
+        keyError = model.saveWybeKey(keyEntry)
+        if keyError == nil {
+            keyEntry = ""
+            replacing = false
+        }
+    }
+}
+
+private struct WybeDiscoveryStep: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var method: WybeRequest.Method = .post
+    @State private var path = "/"
+    @State private var bodyText = ""
+    @State private var source = ""
+    @State private var editing = false
+    @State private var formError: String?
+
+    private var status: (String, Color) {
+        switch model.wybeReadiness.discovery {
+        case .passed: return ("Help answered · not mapped", Theme.success)
+        case .failed: return ("Discovery failed", Theme.danger)
+        case .checking: return ("Sending help…", Theme.accent)
+        case .notChecked: return model.wybeHelpRequest == nil ? ("Help request unresolved", Theme.warning) : ("Not discovered", Theme.warning)
+        }
+    }
+
+    var body: some View {
+        SetupStep(number: 3, title: "Discover the protocol (help)",
+                  enables: "The endpoint says “Speak JSON. Most things start with help.” How to send help has not been observed, so Relay does not guess it. Record the exact form the service or the organisers describe, then send it once.",
+                  status: status.0, statusColor: status.1) {
+            if let help = model.wybeHelpRequest, !editing {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(help.request?.summary ?? "").font(.callout.monospaced()).textSelection(.enabled)
+                    Text("Source: \(help.source)").font(.caption).foregroundStyle(Theme.textSecondary)
+                    AdaptiveRow {
+                        Button("Discover protocol") { model.discoverWybeProtocol() }
+                            .buttonStyle(.dsPrimary)
+                            .disabled(!model.wybeReadiness.connection.isPassed || model.wybeReadiness.discovery.isChecking
+                                      || model.wybeReadiness.connection.isChecking)
+                        if model.wybeReadiness.discovery.isChecking {
+                            Button("Cancel") { model.cancelWybeCheck() }
+                        }
+                        Button("Edit…") { load(help); editing = true }
+                        Button("Clear", role: .destructive) { model.clearWybeHelpRequest() }
+                    }
+                    if !model.wybeReadiness.connection.isPassed {
+                        Text("Check the connection first (step 2).").font(.caption).foregroundStyle(Theme.textSecondary)
+                    }
+                }
+            } else {
+                form
+            }
+            discoveryResult
+        }
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            AdaptiveRow {
+                Picker("Method", selection: $method) {
+                    ForEach(WybeRequest.Method.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented).frame(width: 160)
+                TextField("Path, e.g. /", text: $path).textFieldStyle(.roundedBorder).frame(minWidth: 120, maxWidth: 240)
+            }
+            if method == .post {
+                TextField("JSON body exactly as described by the service", text: $bodyText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder).font(.callout.monospaced()).lineLimit(2...6)
+            }
+            TextField("Where this form comes from (e.g. the text Check connection showed)", text: $source)
+                .textFieldStyle(.roundedBorder)
+            AdaptiveRow {
+                Button("Record help request") { record() }.buttonStyle(.dsPrimary)
+                if editing { Button("Cancel") { editing = false; formError = nil } }
+            }
+            if let formError {
+                Text(formError).font(.caption).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("Relay sends only requests that mention “help”, contain no key and no words such as “start” or “shift”. The key goes only in the Authorization header.")
+                .font(.caption).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder private var discoveryResult: some View {
+        switch model.wybeReadiness.discovery {
+        case let .passed(transcript, _):
+            VStack(alignment: .leading, spacing: 4) {
+                Label("The service answered \(transcript.request) (HTTP \(transcript.httpStatus)). Relay shows the answer verbatim and does not turn it into commands by itself.",
+                      systemImage: "checkmark.seal").font(.callout).foregroundStyle(Theme.success)
+                    .fixedSize(horizontal: false, vertical: true)
+                ServiceText(title: "Help answer", text: transcript.answer)
+            }
+        case let .failed(problem, _):
+            WybeProblemView(problem: problem)
+        case .checking:
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Waiting for the help answer…").font(.callout) }
+        case .notChecked:
+            EmptyView()
+        }
+    }
+
+    private func load(_ help: WybeHelpRequest) {
+        method = help.method
+        path = help.path
+        bodyText = help.body
+        source = help.source
+    }
+
+    private func record() {
+        let request = WybeHelpRequest(method: method, path: path, body: method == .post ? bodyText : "", source: source)
+        formError = model.saveWybeHelpRequest(request)
+        if formError == nil { editing = false }
+    }
+}
+
+private struct ServiceText: View {
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(Theme.textSecondary)
+            ScrollView {
+                Text(text.isEmpty ? "(empty)" : text).font(.caption.monospaced()).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 220)
+            .padding(8)
+            .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: 6))
+        }
+    }
+}
+
+private struct WybeProblemView: View {
+    let problem: WybeProblem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(problem.title, systemImage: "exclamationmark.triangle.fill").font(.callout.weight(.semibold))
+                .foregroundStyle(Theme.danger)
+            Text(problem.nextStep).font(.callout).fixedSize(horizontal: false, vertical: true)
+            if let detail = problem.serviceDetail {
+                Text("Service: \(detail)").font(.caption.monospaced()).foregroundStyle(Theme.textSecondary).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.danger.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.danger.opacity(0.4)))
+    }
+}
+
+private struct WybeChecklistPanel: View {
     var body: some View {
         Panel {
             VStack(alignment: .leading, spacing: 12) {
-                ViewThatFits(in: .horizontal) {
-                    HStack {
-                        Text("Wybe Night Shift — live challenge").font(.headline)
-                        Spacer(minLength: 8)
-                        StatusPill(text: "Live adapter not implemented", color: Theme.warning)
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Wybe Night Shift — live challenge").font(.headline)
-                        StatusPill(text: "Live adapter not implemented", color: Theme.warning)
-                    }
-                }
-                Text("Registering gives your team a key for the organisers' endpoint. Entering that key will not connect Relay: the live adapter still has to be written once the command format is known.")
-                    .font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
-                AdaptiveRow { LinkButton(title: "Open challenge registration", url: ProviderLinks.wybeRegistration) }
-                Instructions(lines: WybeIntegration.registrationSteps)
-
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Integration checklist").font(.caption.weight(.semibold)).foregroundStyle(Theme.textSecondary)
                     ForEach(WybeIntegration.requirements) { requirement in
@@ -785,8 +1094,8 @@ private struct WybePanel: View {
                 .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Available now: simulation").font(.callout.weight(.semibold)).foregroundStyle(Theme.simulation)
-                    Text("Wybe Runner and relay-runner wybe-sim run Relay's own simulator. It uses invented “sim.” commands to exercise the runner's safety features: prioritising tasks, timeouts, bounded retries, not repeating actions after lost responses, and stopping. Its scores are labelled SIMULATED and are not challenge results.")
+                    Text("Simulation is separate").font(.callout.weight(.semibold)).foregroundStyle(Theme.simulation)
+                    Text("Wybe Runner and relay-runner wybe-sim run Relay's own simulator with invented “sim.” commands. Those commands are never sent to the live service, and simulated scores are labelled SIMULATED and are not challenge results.")
                         .font(.caption).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -798,6 +1107,7 @@ private struct WybePanel: View {
         case .known: return "checkmark.circle.fill"
         case .teamProvided: return "person.badge.key"
         case .unknown: return "questionmark.circle"
+        case .implementedUntested: return "checkmark.circle"
         case .needsDevelopment: return "hammer"
         }
     }
@@ -807,6 +1117,7 @@ private struct WybePanel: View {
         case .known: return Theme.success
         case .teamProvided: return Theme.accent
         case .unknown: return Theme.warning
+        case .implementedUntested: return Theme.accent
         case .needsDevelopment: return Theme.danger
         }
     }
@@ -815,7 +1126,8 @@ private struct WybePanel: View {
         switch status {
         case .known: return "known"
         case .teamProvided: return "from registration"
-        case .unknown: return "missing"
+        case .unknown: return "unresolved"
+        case .implementedUntested: return "built, untested with a real key"
         case .needsDevelopment: return "needs development"
         }
     }

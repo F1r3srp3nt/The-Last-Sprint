@@ -221,6 +221,15 @@ public actor AutonomousRunner {
                 observation = try await read("observe") { [adapter] in try await adapter.observe() }
             } catch StopRequested.stopped(let reason) {
                 return await finish(reason)
+            } catch let error as ChallengeError {
+                if case .contractUnavailable = error {
+                    // Key refused or settings changed: nothing more may be sent.
+                    note(.failed, "Observation impossible: \(describe(error))")
+                    return await finish(describe(error))
+                }
+                consecutiveFailures += 1
+                note(.failed, "Observation failed: \(describe(error))")
+                continue
             } catch {
                 consecutiveFailures += 1
                 note(.failed, "Observation failed: \(describe(error))")

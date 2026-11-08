@@ -12,10 +12,11 @@ relay/
 │   │   │                         RuleBasedReasoner, DefaultTaskPlanner, ToolRegistry,
 │   │   │                         AssistantRuntime, VoiceSession state machine
 │   │   ├── Warehouse/            Procedure model, DemoProcedure, renderer, answerer, session
-│   │   └── Wybe/                 ChallengeAdapter, SimulatedNightShift, LiveNightShiftAdapter
-│   │                             (placeholder), ShiftPolicy, AutonomousRunner
+│   │   └── Wybe/                 ChallengeAdapter, SimulatedNightShift, ShiftPolicy, AutonomousRunner,
+│   │                             WybeConnection (known facts, help-request validation, readiness)
 │   ├── RelayAdapters/            ElevenLabs REST (STT, TTS, key check), HTTPTransport,
-│   │                             CredentialStore (Keychain on macOS, in-memory for tests)
+│   │                             CredentialStore (Keychain on macOS, in-memory for tests),
+│   │                             Wybe/ WybeClient (Bearer, bounded) and LiveNightShiftAdapter
 │   ├── RelayRunner/              `relay-runner` CLI — headless, no UI, no speech
 │   └── RelayApp/                 macOS 14 SwiftUI app (only added to the package on macOS)
 ├── Tests/                        XCTest: RelayCoreTests, RelayAdaptersTests
@@ -61,4 +62,6 @@ Interfaces (all in `RelayCore/Assistant/Interfaces.swift` unless noted):
   recorded as blocked, not as failures of the environment. Ambiguous outcomes are recorded
   as unknown.
 - **No faked connections:** speech status becomes "Connected" only after a real request
-  succeeds. The live Wybe adapter throws `contractUnavailable` and has no score.
+  succeeds. Wybe readiness keeps "key saved", "connection verified", "protocol discovered"
+  and "live runner ready" apart; without a reviewed command mapping the live adapter throws
+  `contractUnavailable` before sending anything and has no score.

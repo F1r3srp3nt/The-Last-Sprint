@@ -306,9 +306,10 @@ final class CapabilityTextTests: XCTestCase {
     func testWybeChecklistOnlyClaimsWhatOrganisersPublished() async {
         let known = WybeIntegration.requirements.filter { $0.status == .known }.map(\.id)
         XCTAssertEqual(known, ["endpoint", "auth"])
-        XCTAssertTrue(WybeIntegration.requirements.contains { $0.id == "adapter" && $0.status == .needsDevelopment })
-        XCTAssertTrue(LiveNightShiftAdapter.missingContract.contains("not implemented"))
-        // The live adapter still sends nothing.
+        XCTAssertTrue(WybeIntegration.requirements.contains { $0.id == "mapping" && $0.status == .needsDevelopment })
+        XCTAssertTrue(WybeIntegration.requirements.contains { $0.id == "help-format" && $0.status == .unknown })
+        XCTAssertTrue(LiveNightShiftAdapter.missingContract(clientAvailable: false, mappingAvailable: false).contains("will not send anything"))
+        // Without a key and a reviewed mapping the live adapter still sends nothing.
         do { _ = try await LiveNightShiftAdapter().observe(); XCTFail() }
         catch { guard case ChallengeError.contractUnavailable = error else { return XCTFail("\(error)") } }
     }

@@ -14,7 +14,7 @@ var products: [Product] = [
 var targets: [Target] = [
     .target(name: "RelayCore"),
     .target(name: "RelayAdapters", dependencies: ["RelayCore"]),
-    .executableTarget(name: "RelayRunner", dependencies: ["RelayCore"]),
+    .executableTarget(name: "RelayRunner", dependencies: ["RelayCore", "RelayAdapters"]),
     .testTarget(name: "RelayCoreTests", dependencies: ["RelayCore"]),
     .testTarget(name: "RelayAdaptersTests", dependencies: ["RelayAdapters", "RelayCore"]),
 ]

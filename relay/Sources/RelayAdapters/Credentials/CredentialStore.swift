@@ -12,6 +12,16 @@ public protocol CredentialStore: Sendable {
 public enum CredentialAccount {
     /// ElevenLabs API key (sent as the `xi-api-key` header).
     public static let elevenLabsAPIKey = "elevenlabs.api-key"
+    /// Wybe Night Shift team key (sent as `Authorization: Bearer`). Kept under its own Keychain
+    /// service (`CredentialService.wybe`), separate from the ElevenLabs entry.
+    public static let wybeTeamKey = "wybe.team-key"
+}
+
+public enum CredentialService {
+    /// Keychain service for ElevenLabs and other Relay settings.
+    public static let relay = "com.oslosprint.relay"
+    /// Keychain service used only for the Wybe team key.
+    public static let wybe = "com.oslosprint.relay.wybe"
 }
 
 public enum CredentialError: Error, Equatable, CustomStringConvertible {

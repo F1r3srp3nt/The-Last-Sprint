@@ -4,6 +4,7 @@ import Glibc
 #elseif canImport(Darwin)
 import Darwin
 #endif
+import RelayAdapters
 import RelayCore
 
 // relay-runner — headless entry point. No window, speech service or per-action confirmation.
@@ -13,7 +14,9 @@ let usage = """
 
     USAGE
       relay-runner wybe-sim [options]     Run the deterministic Night Shift SIMULATION
-      relay-runner wybe-live              Explain what the live Wybe connection still needs (sends nothing)
+      relay-runner wybe-live              Show what the live Wybe connection still needs (sends nothing)
+      relay-runner wybe-connect [key]     Check the connection: one authenticated GET / (never starts a shift)
+      relay-runner wybe-help [key] HELP   Send the help request you recorded, once, and print the answer
       relay-runner warehouse [options]    Text-only warehouse training demo (reads commands from stdin)
       relay-runner export-procedure       Print the synthetic demo procedure as JSON
       relay-runner help
@@ -29,6 +32,18 @@ let usage = """
       --json PATH         Write the run reports (JSON) to PATH
       --verbose           Print each decision's rationale
       Ctrl-C              First press: stop before the next action. Second press: exit immediately.
+
+    wybe-live OPTIONS
+      --start             Ask to start a LIVE run. Refused in this build: no reviewed command mapping exists.
+
+    Wybe team key ([key]) — never pass the key itself as an argument:
+      WYBE_TEAM_KEY=…     environment variable (default), or
+      --key-file PATH     file containing only the key (keep it outside the repository), or
+      --keychain          the key saved by Relay.app (macOS Keychain, service com.oslosprint.relay.wybe)
+      The event code from the venue screen is for the registration page only; it is not the key.
+
+    wybe-help HELP (exactly as the service describes it; nothing is guessed)
+      --method GET|POST   --path /…   --body JSON (POST only)   --source TEXT (where you saw this form)
 
     warehouse OPTIONS
       --lang CODE         en | nb | pl (default en)
@@ -187,15 +202,106 @@ final class Counter: @unchecked Sendable {
     func increment() -> Int { lock.lock(); defer { lock.unlock() }; value += 1; return value }
 }
 
-func runLive() async -> Int32 {
+func runLive(_ args: Arguments) async -> Int32 {
     print("LIVE MODE — nothing will be sent.\n")
+    print("Known: endpoint \(WybeIntegration.endpoint), sent as Authorization: Bearer <team key>.")
+    for line in WybeIntegration.credentialsExplained { print("  • " + line) }
+    print("\nStill unresolved:")
+    for requirement in WybeIntegration.missing where requirement.status == .unknown || requirement.status == .needsDevelopment {
+        print("  • \(requirement.title): \(requirement.detail)")
+    }
+    print("\nNext steps without starting a shift: relay-runner wybe-connect, then relay-runner wybe-help.")
+    if args.flags.contains("start") {
+        print("\nRefused: --start needs a reviewed command mapping and a live policy, and this build has neither "
+              + "(the help answer has not been obtained). Nothing was sent and no shift was started.")
+    }
+    // The runner itself refuses before sending anything (no client, no mapping).
     let log = InMemoryEventLog()
     let runner = AutonomousRunner(adapter: LiveNightShiftAdapter(), policy: SimulatedShiftPolicy(),
                                   configuration: RunnerConfiguration(expectedMode: .live, allowedActions: []),
                                   log: log, stop: stopSignal)
     let report = await runner.run()
-    print(report.summary)
+    print("\n" + report.summary)
     return 2
+}
+
+/// Loads the team key from the environment, a file or (macOS) the Keychain. Never from argv.
+func loadTeamKey(_ args: Arguments) -> String? {
+    var key: String?
+    if args.flags.contains("keychain") {
+        #if canImport(Security)
+        key = try? KeychainCredentialStore(service: CredentialService.wybe).read(CredentialAccount.wybeTeamKey)
+        #else
+        printError("--keychain is only available on macOS.")
+        #endif
+    } else if let path = args.options["key-file"] {
+        key = (try? String(contentsOfFile: path, encoding: .utf8))
+    } else {
+        key = ProcessInfo.processInfo.environment["WYBE_TEAM_KEY"]
+    }
+    guard let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+    Redactor.shared.register(secret: trimmed)
+    return trimmed
+}
+
+func wybeClient(_ args: Arguments) -> WybeClient? {
+    guard let key = loadTeamKey(args) else {
+        printError("No team key. Set WYBE_TEAM_KEY, or use --key-file PATH or --keychain. (The event code is not the key.)")
+        return nil
+    }
+    if let problem = WybeTeamKeyValidation.problem(with: key) {
+        printError("Not sent: \(problem)")
+        return nil
+    }
+    return WybeClient(teamKey: { key })
+}
+
+func printProblem(_ failure: WybeFailure) {
+    let problem = WybeProblem(failure)
+    print("FAILED: \(problem.title)\n  \(problem.nextStep)")
+    if let detail = problem.serviceDetail { print("  Service: \(Redactor.shared.redact(detail))") }
+}
+
+func exitCode(for failure: WybeFailure) -> Int32 {
+    switch failure {
+    case .keyRefused, .forbidden: return 3
+    case .invalidRequest, .missingKey: return 64
+    default: return 1
+    }
+}
+
+func runConnect(_ args: Arguments) async -> Int32 {
+    guard let client = wybeClient(args) else { return 64 }
+    print("Checking the connection: GET \(WybeIntegration.endpoint) with the team key (read-only; no shift is started).")
+    switch await client.checkConnection() {
+    case let .success(report):
+        print("Connection verified. \(report.detail)")
+        print("Service said:\n" + report.resultText.split(separator: "\n", omittingEmptySubsequences: false).map { "  │ " + $0 }.joined(separator: "\n"))
+        return 0
+    case let .failure(failure):
+        printProblem(failure)
+        return exitCode(for: failure)
+    }
+}
+
+func runHelp(_ args: Arguments) async -> Int32 {
+    guard let method = WybeRequest.Method(rawValue: (args.options["method"] ?? "").uppercased()), let path = args.options["path"] else {
+        printError("Give the help request exactly as the service describes it: --method GET|POST --path /… [--body JSON] --source TEXT")
+        return 64
+    }
+    let help = WybeHelpRequest(method: method, path: path, body: args.options["body"] ?? "", source: args.options["source"] ?? "")
+    if let problem = help.problem() { printError("Not sent: \(problem)"); return 64 }
+    guard let client = wybeClient(args) else { return 64 }
+    print("Sending the help request once (not retried): \(help.request?.summary ?? "")")
+    switch await client.discover(with: help) {
+    case let .success(transcript):
+        print("Help answered (HTTP \(transcript.httpStatus)). Commands are NOT mapped automatically; review this answer:")
+        print(transcript.answer.split(separator: "\n", omittingEmptySubsequences: false).map { "  │ " + $0 }.joined(separator: "\n"))
+        return 0
+    case let .failure(failure):
+        printProblem(failure)
+        return exitCode(for: failure)
+    }
 }
 
 func runWarehouse(_ args: Arguments) async -> Int32 {
@@ -250,7 +356,9 @@ let arguments = Arguments(Array(CommandLine.arguments.dropFirst()))
 let status: Int32
 switch arguments.command {
 case "wybe-sim": status = await runSimulation(arguments)
-case "wybe-live": status = await runLive()
+case "wybe-live": status = await runLive(arguments)
+case "wybe-connect": status = await runConnect(arguments)
+case "wybe-help": status = await runHelp(arguments)
 case "warehouse": status = await runWarehouse(arguments)
 case "export-procedure":
     status = (try? DemoProcedure.procedure.jsonData()).map { print(String(decoding: $0, as: UTF8.self)); return 0 } ?? 1

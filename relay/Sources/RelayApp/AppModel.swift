@@ -58,7 +58,20 @@ final class AppModel: ObservableObject {
         didSet { refreshSpeechStatus() }
     }
 
-    // MARK: Wybe (simulation only in this milestone)
+    // MARK: Wybe connection (live). Separate Keychain entry from ElevenLabs.
+    private let wybeCredentials: CredentialStore = KeychainCredentialStore(service: CredentialService.wybe)
+    @Published private(set) var wybeKeyDisplay = "Not set"
+    /// Four separate facts: key saved, connection verified, protocol discovered, live runner ready.
+    @Published private(set) var wybeReadiness = WybeReadiness(keySaved: false, helpRequestRecorded: false,
+                                                               reviewedMappingAvailable: WybeProtocolMappings.reviewed != nil)
+    /// The help request exactly as the service describes it, recorded by the team. Not a secret.
+    @Published private(set) var wybeHelpRequest: WybeHelpRequest?
+    private var wybeCheckTask: Task<Void, Never>?
+    /// One client per saved key, so its rate limiter spans all checks made with that key.
+    private var wybeClientCache: (keyGeneration: Int, client: WybeClient)?
+    private var wybeKeyGeneration = 0
+
+    // MARK: Wybe simulation
     @Published var wybeRunning = false
     @Published var wybeObservation: RelayCore.Observation?
     @Published var wybeDecision = ""
@@ -75,6 +88,7 @@ final class AppModel: ObservableObject {
         static let config = "relay.elevenlabs.configuration"
         static let autoSpeak = "relay.speech.autoSpeak"
         static let languageHint = "relay.speech.languageHint"
+        static let wybeHelpRequest = "relay.wybe.helpRequest"
     }
 
     init() {
@@ -113,6 +127,14 @@ final class AppModel: ObservableObject {
         let savedKey = CredentialAccess.load(CredentialAccount.elevenLabsAPIKey, from: credentials)
         if let savedKey { apiKeyDisplay = CredentialAccess.masked(savedKey) }
         readiness = ElevenLabsReadiness(keySaved: savedKey != nil, voiceIDSet: !elevenLabs.voiceID.isEmpty)
+        let savedWybeKey = CredentialAccess.load(CredentialAccount.wybeTeamKey, from: wybeCredentials)
+        wybeKeyDisplay = WybeTeamKeyValidation.display(savedWybeKey)
+        if let data = defaults.data(forKey: Keys.wybeHelpRequest),
+           let saved = try? JSONDecoder().decode(WybeHelpRequest.self, from: data), saved.problem() == nil {
+            wybeHelpRequest = saved
+        }
+        wybeReadiness = WybeReadiness(keySaved: savedWybeKey != nil, helpRequestRecorded: wybeHelpRequest != nil,
+                                      reviewedMappingAvailable: WybeProtocolMappings.reviewed != nil)
         refreshMicrophone()
         refreshSpeechStatus()
         log.record(.settings, .info, "Relay started. \(readiness.summary)")
@@ -637,6 +659,140 @@ final class AppModel: ObservableObject {
         player.stop()
         try? voice.handle(.stopSpeaking)
         if wasSpeaking { log.record(.speech, .info, "Playback stopped") }
+    }
+
+    // MARK: Wybe connection
+
+    /// Saves (or replaces) the team key in its own Keychain entry. Saving verifies nothing.
+    /// Returns an error message to show next to the field, or nil on success.
+    @discardableResult
+    func saveWybeKey(_ raw: String) -> String? {
+        if let problem = WybeTeamKeyValidation.problem(with: raw) {
+            // Never store or log the rejected text: it may be another credential.
+            log.record(.settings, .rejected, "Wybe team key not saved: \(problem)")
+            return problem
+        }
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let replacing = wybeReadiness.keySaved
+        do {
+            try CredentialAccess.save(key, account: CredentialAccount.wybeTeamKey, to: wybeCredentials)
+        } catch {
+            log.record(.settings, .failed, "Saving the Wybe team key failed: \(error)")
+            return "Could not save to the Keychain: \(error)"
+        }
+        stopPendingWybeCheck()
+        wybeKeyGeneration += 1
+        wybeClientCache = nil
+        wybeKeyDisplay = WybeTeamKeyValidation.display(key)
+        wybeReadiness.apply(.keySaved)
+        log.record(.settings, .info, replacing ? "Wybe team key replaced in the Keychain (not verified yet)"
+                                               : "Wybe team key saved to the Keychain (not verified yet)")
+        return nil
+    }
+
+    func removeWybeKey() {
+        do {
+            try wybeCredentials.delete(CredentialAccount.wybeTeamKey)
+        } catch {
+            notice = "Could not remove the Wybe team key: \(error)"
+            return
+        }
+        stopPendingWybeCheck()
+        wybeKeyGeneration += 1
+        wybeClientCache = nil
+        wybeKeyDisplay = "Not set"
+        wybeReadiness.apply(.keyRemoved)
+        log.record(.settings, .info, "Wybe team key removed from the Keychain")
+    }
+
+    /// Records the help request form the service describes. Returns a problem, or nil on success.
+    @discardableResult
+    func saveWybeHelpRequest(_ request: WybeHelpRequest) -> String? {
+        if let problem = request.problem() {
+            log.record(.settings, .rejected, "Wybe help request not recorded: \(problem)")
+            return problem
+        }
+        stopPendingWybeCheck()
+        wybeHelpRequest = request
+        if let data = try? JSONEncoder().encode(request) { UserDefaults.standard.set(data, forKey: Keys.wybeHelpRequest) }
+        wybeReadiness.apply(.helpRequestChanged(recorded: true))
+        log.record(.settings, .info, "Wybe help request recorded: \(request.request?.summary ?? "") (source: \(request.source))")
+        return nil
+    }
+
+    func clearWybeHelpRequest() {
+        stopPendingWybeCheck()
+        wybeHelpRequest = nil
+        UserDefaults.standard.removeObject(forKey: Keys.wybeHelpRequest)
+        wybeReadiness.apply(.helpRequestChanged(recorded: false))
+        log.record(.settings, .info, "Wybe help request cleared")
+    }
+
+    private func currentWybeClient() -> WybeClient? {
+        if let cache = wybeClientCache, cache.keyGeneration == wybeKeyGeneration { return cache.client }
+        // Snapshot of the key: a later replacement gets a new client and the old one's results are discarded.
+        guard let key = CredentialAccess.load(CredentialAccount.wybeTeamKey, from: wybeCredentials) else { return nil }
+        let client = WybeClient(teamKey: { key })
+        wybeClientCache = (keyGeneration: wybeKeyGeneration, client: client)
+        return client
+    }
+
+    /// Explicit user action: one authenticated GET / (read-only). Never starts a shift.
+    func checkWybeConnection() {
+        guard let client = currentWybeClient(), let generation = wybeReadiness.beginConnectionCheck() else { return }
+        log.record(.wybe, .attempted, "Connection check: GET \(WybeIntegration.endpoint) with the team key (read-only)", mode: .live)
+        wybeCheckTask = Task { [weak self] in
+            let result = await client.checkConnection()
+            guard let self else { return }
+            guard self.wybeReadiness.apply(.connectionFinished(generation: generation, result, at: Date())) else {
+                self.log.record(.wybe, .info, "Discarded a connection result: the key or settings changed while it was pending", mode: .live)
+                return
+            }
+            switch result {
+            case let .success(report):
+                self.log.record(.wybe, .succeeded, "Connection verified (HTTP \(report.httpStatus)). Service said: \(report.resultText)", mode: .live)
+            case .failure(.cancelled):
+                self.log.record(.wybe, .info, "Connection check cancelled", mode: .live)
+            case let .failure(failure):
+                self.log.record(.wybe, .failed, "Connection check failed: \(failure)", mode: .live)
+            }
+        }
+    }
+
+    /// Explicit user action: sends the recorded help request once. Never retried automatically.
+    func discoverWybeProtocol() {
+        guard let help = wybeHelpRequest, let client = currentWybeClient(),
+              let generation = wybeReadiness.beginDiscovery() else { return }
+        log.record(.wybe, .attempted, "Protocol discovery: \(help.request?.summary ?? "") (sent once)", mode: .live)
+        wybeCheckTask = Task { [weak self] in
+            let result = await client.discover(with: help)
+            guard let self else { return }
+            guard self.wybeReadiness.apply(.discoveryFinished(generation: generation, result, at: Date())) else {
+                self.log.record(.wybe, .info, "Discarded a help answer: the key or settings changed while it was pending", mode: .live)
+                return
+            }
+            switch result {
+            case let .success(transcript):
+                self.log.record(.wybe, .succeeded, "Help answered (HTTP \(transcript.httpStatus)); commands are not mapped automatically",
+                                mode: .live, details: ["answer": String(transcript.answer.prefix(2_000))])
+            case .failure(.cancelled):
+                self.log.record(.wybe, .info, "Protocol discovery cancelled", mode: .live)
+            case let .failure(failure):
+                self.log.record(.wybe, .failed, "Protocol discovery failed: \(failure)", mode: .live)
+            }
+        }
+    }
+
+    func cancelWybeCheck() {
+        guard wybeReadiness.connection.isChecking || wybeReadiness.discovery.isChecking else { return }
+        stopPendingWybeCheck()
+        log.record(.wybe, .info, "Wybe check cancelled; an answer that still arrives will be ignored", mode: .live)
+    }
+
+    private func stopPendingWybeCheck() {
+        wybeCheckTask?.cancel()
+        wybeCheckTask = nil
+        wybeReadiness.apply(.checkCancelled)
     }
 
     // MARK: Wybe simulation
