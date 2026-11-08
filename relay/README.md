@@ -22,7 +22,7 @@ Real window captures of the packaged `Relay.app`, taken by the Relay workflow on
 
 ![Relay Warehouse Training: synthetic Dock B procedure with English, Norwegian Bokmål and Polish](docs/screenshots/warehouse-training.png)
 
-**Wybe Runner**: simulation controls, clearly marked SIMULATED. Live mode is unavailable. *Captured 8 November 2026.*
+**Wybe Runner**: simulation controls, clearly marked SIMULATED. Live mode is unavailable: no team key is saved, and no reviewed command mapping exists yet. *Captured 8 November 2026.*
 
 ![Relay Wybe Runner: simulation controls marked SIMULATED, live mode unavailable, empty action history](docs/screenshots/wybe-runner.png)
 
@@ -37,8 +37,8 @@ Real window captures of the packaged `Relay.app`, taken by the Relay workflow on
 </details>
 
 <sub>**Screenshot provenance:**
-- Source: Relay workflow [run 42444109030](https://github.com/F1r3srp3nt/Oslo-Sprint/actions/runs/42444109030) on `main` at commit `4b0b30bd8f600a59b5a0816f8e75c5a48cc4ec30`, which includes the latest Relay code change (`daf6daa`, PR #11, with the Wybe Runner sidebar fix).
-- Captured on 8 November 2026 (about 03:49 UTC). The app is version 0.2.0, and its Build card shows `4b0b30b`.
+- Source: Relay workflow [run 42517732787](https://github.com/F1r3srp3nt/The-Last-Sprint/actions/runs/42517732787) on `main` at commit `be7808f6f165544f8f8a9737d0905ee237643873`, which includes the HCG logo as the app icon and sidebar mark (The-Last-Sprint PR #5) and the Wybe connection setup (PR #2).
+- Captured on 8 November 2026 (about 20:02 UTC). The app is version 0.2.0, and its Build card shows `be7808f`.
 - The window is at its minimum size (980 points wide).
 - The images are unedited copies of the CI artifact.</sub>
 

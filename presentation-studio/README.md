@@ -17,9 +17,9 @@ These are **browser screenshots**: Chromium driven by Playwright in the end-to-e
 ![Presentation Studio presentation mode in a browser: a mock-generated slide with a synthetic harbour illustration and narration controls](docs/screenshots/presentation-mode.png)
 
 <sub>**Screenshot provenance:**
-- Source: the `e2e` job of the Presentation Studio workflow, [run 42444090395](https://github.com/F1r3srp3nt/Oslo-Sprint/actions/runs/42444090395), on `main` at commit `cf8c54b74aa7be18b4a606b8d40ebc80120d4e9e`, the latest Presentation Studio change.
-- Captured on 8 November 2026 (about 03:47 UTC) in headless Chromium at 1440×900.
-- The images are unedited copies of the CI artifact (`a2-editor.png`, `b4-present.png`).</sub>
+- Source: `npm run test:e2e` (the same end-to-end test the workflow's `e2e` job runs), on `main` at commit `80cd784e430c08553fa68674cbabe612bbc0a0e2`, which includes the HCG logo in the top bar (The-Last-Sprint PR #5). Run locally on Linux because the CI artifact could not be downloaded from the build environment; that test passed in CI on the same commit ([run 42517825583](https://github.com/F1r3srp3nt/The-Last-Sprint/actions/runs/42517825583)).
+- Captured on 8 November 2026 (about 20:10 UTC) in headless Chromium at 1440×900.
+- The images are unedited copies of the test output (`a2-editor.png`, `b4-present.png`).</sub>
 
 ## Desktop app
 
