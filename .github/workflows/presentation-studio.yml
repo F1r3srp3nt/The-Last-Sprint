@@ -1,0 +1,83 @@
+name: Presentation Studio
+
+on:
+  pull_request:
+    paths:
+      - "presentation-studio/**"
+      - ".github/workflows/presentation-studio.yml"
+  push:
+    branches: [main]
+    paths:
+      - "presentation-studio/**"
+      - ".github/workflows/presentation-studio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: presentation-studio-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: presentation-studio
+
+jobs:
+  checks:
+    name: Type-check, unit/API tests, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: presentation-studio/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: No credentials in tracked files
+        run: ./scripts/check-no-secrets.sh
+      - name: Type-check
+        run: npm run typecheck
+      - name: Unit and API tests (mock providers; no network, no keys)
+        run: npm test
+      - name: Build
+        run: npx vite build
+
+  e2e:
+    name: Browser end-to-end (Chromium, mock providers)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: presentation-studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: npm ci
+      - name: Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Export validators (python-pptx, LibreOffice)
+        run: |
+          python -m pip install --quiet python-pptx==1.0.2
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libreoffice-impress
+          soffice --version
+      - name: End-to-end test
+        run: npm run test:e2e
+      - name: Upload screenshots and exported files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: presentation-studio-e2e
+          path: presentation-studio/test-output/e2e
+          retention-days: 14
+          if-no-files-found: ignore

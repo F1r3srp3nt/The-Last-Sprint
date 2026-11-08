@@ -1,0 +1,2 @@
+70b1708a5d5306b209cf0419ec2401a1913b2fbcf98b2e5d2c7bdd19bb76eb8c  Relay-1.0.0-osx-arm64.app.zip
+675f9e4d8d57a6c32918d7243f52b1c139da6f5241e3bedb4e94bc1c67c00786  Relay-1.0.0-osx-arm64.dmg

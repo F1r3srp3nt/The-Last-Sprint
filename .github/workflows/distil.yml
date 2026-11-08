@@ -1,0 +1,132 @@
+name: Distil
+
+on:
+  pull_request:
+    paths:
+      - "distil/**"
+      - ".github/workflows/distil.yml"
+      - ".github/scripts/**"
+  push:
+    branches: [main]
+    paths:
+      - "distil/**"
+      - ".github/workflows/distil.yml"
+      - ".github/scripts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distil-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: distil
+
+jobs:
+  linux:
+    name: Linux — core engine and tests
+    runs-on: ubuntu-24.04
+    container: swift:6.0-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trust checkout (container runs as a different user)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Toolchain
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+
+  macos:
+    name: macOS — includes SwiftUI app target
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+      - name: Prerequisites (build, package and test)
+        run: bash scripts/check-prereqs.sh --tests
+      # Testing and packaging are separate commands; packaging never compiles the test targets.
+      - name: Test (scripts/test.sh)
+        run: bash scripts/test.sh
+      - name: Package Distil.app (scripts/build-macos.sh)
+        run: bash scripts/build-macos.sh
+      - name: Launch check (opens the packaged app)
+        run: bash ../.github/scripts/launch-check.sh dist/Distil.app 8
+      - name: Self-check (the running app reports its bundle, Info.plist commit and windows)
+        run: bash ../.github/scripts/self-check.sh dist/Distil.app
+      # Window captures of the built app, for checking the look without a Mac. Download them from the
+      # run's Artifacts. Not a test: a capture problem doesn't fail the job.
+      - name: Screenshots
+        continue-on-error: true
+        env:
+          WINDOW_ID: ${{ runner.temp }}/window-id
+        run: |
+          swiftc -O ../.github/scripts/window-id.swift -o "$WINDOW_ID"
+          mkdir -p screenshots
+          shot() { ../.github/scripts/app-screenshot.sh dist/Distil.app "screenshots/$1.png" "${@:2}"; }
+          shot 01-overview-empty-project
+          n=2
+          for section in overview workspace comparison library experiments settings; do
+            shot "$(printf %02d $n)-$section-demo" --screenshot-demo pastedNotes --screenshot-section "$section"
+            n=$((n + 1))
+          done
+          shot 08-workspace-demo-light --screenshot-demo pastedNotes --screenshot-section workspace -appearance Light
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: distil-screenshots
+          path: distil/screenshots/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Zip Distil.app (ditto keeps the bundle and its signature intact)
+        run: ditto -c -k --keepParent dist/Distil.app "dist/Distil-${GITHUB_SHA::7}.zip"
+      # A downloadable test build, not a release. It is ad-hoc signed: macOS asks for confirmation the
+      # first time (Control-click › Open). Kept for 14 days.
+      - name: Upload Distil.app
+        uses: actions/upload-artifact@v4
+        with:
+          name: distil-app
+          path: distil/dist/Distil-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # Reproduces a Mac where only the Command Line Tools are selected (no full Xcode), for this job only.
+  # Packaging and launching must work there; the test outcome is recorded but not required, because
+  # XCTest usually ships only with Xcode.
+  macos-clt:
+    name: macOS — Command Line Tools only (package and launch)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the Command Line Tools for this job only
+        run: |
+          if [ -x /Library/Developer/CommandLineTools/usr/bin/swift ]; then
+            echo "DEVELOPER_DIR=/Library/Developer/CommandLineTools" >> "$GITHUB_ENV"
+          else
+            echo "::error::The Command Line Tools are not installed on this runner, so this job cannot reproduce that setup."
+            exit 1
+          fi
+      - name: Prerequisites for tests (records whether XCTest is available)
+        continue-on-error: true
+        run: bash scripts/check-prereqs.sh --tests
+      - name: Tests with the Command Line Tools (outcome recorded, not required)
+        continue-on-error: true
+        run: bash scripts/test.sh
+      - name: Package Distil.app with the Command Line Tools
+        run: bash scripts/build-macos.sh
+      - name: Launch check
+        run: bash ../.github/scripts/launch-check.sh dist/Distil.app 8
+      - name: Self-check (the running app reports its bundle, Info.plist commit and windows)
+        run: bash ../.github/scripts/self-check.sh dist/Distil.app

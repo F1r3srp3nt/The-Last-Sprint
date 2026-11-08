@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+build/
+*.xcodeproj
+xcuserdata/
+DerivedData/
+.DS_Store
+# Runner output (may contain run history; never credentials, but keep out of git)
+runs/
+*.log
+# CI screenshot output (docs/screenshots/ is committed)
+/screenshots/

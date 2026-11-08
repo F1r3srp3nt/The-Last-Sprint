@@ -1,0 +1,2 @@
+884e2d6f93855b894638276fc4cb58ebed84ad96c2947c74cf8c02c63d9cafd9  Distil-1.0.0-osx-arm64.app.zip
+86a2d6aa2ca48ee61dddb328b8228a262904bd83204c4861509efe44f170a82e  Distil-1.0.0-osx-arm64.dmg

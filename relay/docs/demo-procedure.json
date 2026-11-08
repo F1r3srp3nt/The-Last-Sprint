@@ -1,0 +1,563 @@
+{
+  "disclaimer" : {
+    "values" : {
+      "en" : "Demonstration material created for the Relay prototype. Not official Holio documentation and not a real site procedure.",
+      "nb" : "Demonstrasjonsmateriale laget for Relay-prototypen. Ikke offisiell Holio-dokumentasjon og ikke en ekte arbeidsprosedyre.",
+      "pl" : "Materiał demonstracyjny przygotowany dla prototypu Relay. To nie jest oficjalna dokumentacja Holio ani rzeczywista procedura."
+    }
+  },
+  "escalationContact" : {
+    "values" : {
+      "en" : "the shift lead",
+      "nb" : "skiftlederen",
+      "pl" : "kierownik zmiany"
+    }
+  },
+  "facts" : [
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Wear safety shoes, a high-visibility vest and cut-resistant gloves.",
+          "nb" : "Bruk vernesko, refleksvest og kuttsikre hansker.",
+          "pl" : "Noś obuwie ochronne, kamizelkę odblaskową i rękawice antyprzecięciowe."
+        }
+      },
+      "id" : "F1",
+      "keywords" : [
+        "glove",
+        "gloves",
+        "ppe",
+        "vest",
+        "shoes",
+        "safety shoes",
+        "hansker",
+        "vernesko",
+        "refleksvest",
+        "rękawice",
+        "kamizelk",
+        "obuwie"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S1"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Only enter the dock area when the dock light is green. Never enter while a truck is reversing.",
+          "nb" : "Gå bare inn i portområdet når portlyset er grønt. Gå aldri inn mens en lastebil rygger.",
+          "pl" : "Wchodź na rampę tylko przy zielonym świetle. Nigdy nie wchodź, gdy ciężarówka cofa."
+        }
+      },
+      "id" : "F2",
+      "keywords" : [
+        "light",
+        "green",
+        "red light",
+        "reversing",
+        "truck",
+        "enter the dock",
+        "lys",
+        "grønt",
+        "lastebil",
+        "rygger",
+        "światło",
+        "zielone",
+        "ciężarówka",
+        "cofa"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S1"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "If the delivery is not on the expected list, do not unload. Call the shift lead.",
+          "nb" : "Hvis leveransen ikke står på listen, skal du ikke losse. Ring skiftlederen.",
+          "pl" : "Jeśli dostawy nie ma na liście, nie rozładowuj. Zadzwoń do kierownika zmiany."
+        }
+      },
+      "id" : "F3",
+      "keywords" : [
+        "not on the list",
+        "not on list",
+        "expected list",
+        "unexpected delivery",
+        "delivery note",
+        "ikke på listen",
+        "følgeseddel",
+        "nie ma na liście",
+        "dokument dostawy"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S2"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Stop, step back and alert the shift lead. Do not touch the liquid.",
+          "nb" : "Stopp, gå unna og varsle skiftlederen. Ikke berør væsken.",
+          "pl" : "Zatrzymaj się, odsuń i powiadom kierownika zmiany. Nie dotykaj cieczy."
+        }
+      },
+      "id" : "F4",
+      "keywords" : [
+        "leak",
+        "leaking",
+        "smell",
+        "liquid",
+        "spill",
+        "wet",
+        "lekkasje",
+        "lukt",
+        "væske",
+        "wyciek",
+        "zapach",
+        "ciecz"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S3"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Look for torn wrap, crushed corners, wet cardboard or leaks, and photograph any damage with the scanner.",
+          "nb" : "Se etter revnet strekkfilm, knuste hjørner, våt papp eller lekkasjer, og ta bilde av skader med skanneren.",
+          "pl" : "Sprawdź rozdartą folię, zgniecione rogi, mokry karton lub wycieki i sfotografuj uszkodzenia skanerem."
+        }
+      },
+      "id" : "F5",
+      "keywords" : [
+        "damage",
+        "damaged pallet",
+        "torn",
+        "crushed",
+        "photo of damage",
+        "skade",
+        "revnet",
+        "uszkodz",
+        "zgniecione"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S3"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "The hand pallet jack is rated for 1,000 kg. Heavier pallets must be moved with powered equipment by a certified operator.",
+          "nb" : "Jekketralla er godkjent for 1 000 kg. Tyngre paller skal flyttes med motorisert utstyr av en sertifisert fører.",
+          "pl" : "Ręczny wózek paletowy ma udźwig 1000 kg. Cięższe palety musi przewieźć certyfikowany operator sprzętem z napędem."
+        }
+      },
+      "id" : "F6",
+      "keywords" : [
+        "weight",
+        "heavy",
+        "kg",
+        "how much",
+        "limit",
+        "capacity",
+        "pallet jack",
+        "vekt",
+        "tung",
+        "jekketralle",
+        "waga",
+        "ciężk",
+        "udźwig",
+        "wózek"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S4"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Never stand or walk under a raised load, and lower the forks fully before leaving the pallet.",
+          "nb" : "Stå eller gå aldri under en hevet last, og senk gaflene helt før du forlater pallen.",
+          "pl" : "Nigdy nie stój pod podniesionym ładunkiem i całkowicie opuść widły, zanim odejdziesz od palety."
+        }
+      },
+      "id" : "F7",
+      "keywords" : [
+        "raised load",
+        "under the load",
+        "forks",
+        "lower",
+        "hevet last",
+        "gaflene",
+        "podniesion",
+        "widły"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S4"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Type the number manually and mark the label as \"label damaged\".",
+          "nb" : "Tast nummeret manuelt og merk lappen som «skadet lapp».",
+          "pl" : "Wpisz numer ręcznie i oznacz etykietę jako „uszkodzona etykieta”."
+        }
+      },
+      "id" : "F8",
+      "keywords" : [
+        "unreadable",
+        "cannot read",
+        "can't read",
+        "label damaged",
+        "damaged label",
+        "manually",
+        "sscc",
+        "kan ikke leses",
+        "manuelt",
+        "nieczyteln",
+        "ręcznie",
+        "uszkodzona etykieta"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S5"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Count the cartons, compare with the scanner, and record any shortage, surplus or damage with a photo.",
+          "nb" : "Tell kartongene, sammenlign med skanneren og registrer mangler, overskudd eller skader med bilde.",
+          "pl" : "Policz kartony, porównaj ze skanerem i zapisz braki, nadwyżki lub uszkodzenia ze zdjęciem."
+        }
+      },
+      "id" : "F9",
+      "keywords" : [
+        "count",
+        "shortage",
+        "missing carton",
+        "surplus",
+        "too many",
+        "quantity",
+        "telle",
+        "antall",
+        "mangler",
+        "overskudd",
+        "policz",
+        "brak",
+        "nadwyżk",
+        "ilość"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S6"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Attach the put-away label on two sides and leave the pallet in the staging area with the zone letter shown on the scanner.",
+          "nb" : "Fest plasseringslappen på to sider og sett pallen i buffersonen med sonebokstaven som vises på skanneren.",
+          "pl" : "Przyklej etykietę na dwóch bokach i zostaw paletę w strefie buforowej z literą pokazaną na skanerze."
+        }
+      },
+      "id" : "F10",
+      "keywords" : [
+        "where do i put",
+        "where should",
+        "staging",
+        "zone",
+        "zone letter",
+        "put-away",
+        "put away",
+        "buffersone",
+        "sonebokstav",
+        "strefa",
+        "buforow",
+        "gdzie"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S7"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "Keep fire exits and yellow walkways clear. Never leave a pallet in a walkway.",
+          "nb" : "Hold nødutganger og gule gangveier frie. Sett aldri en pall i en gangvei.",
+          "pl" : "Utrzymuj wyjścia ewakuacyjne i żółte przejścia wolne. Nigdy nie zostawiaj palety na przejściu."
+        }
+      },
+      "id" : "F11",
+      "keywords" : [
+        "walkway",
+        "fire exit",
+        "emergency exit",
+        "gangvei",
+        "nødutgang",
+        "przejście",
+        "wyjście ewakuacyjne"
+      ],
+      "kind" : "answer",
+      "supportingStepID" : "S7"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "This procedure does not cover temperature-controlled goods.",
+          "nb" : "Denne prosedyren dekker ikke temperaturregulerte varer.",
+          "pl" : "Ta procedura nie obejmuje towarów wymagających kontroli temperatury."
+        }
+      },
+      "id" : "X1",
+      "keywords" : [
+        "frozen",
+        "chilled",
+        "cold",
+        "temperature",
+        "fridge",
+        "freezer",
+        "frossen",
+        "kjøl",
+        "temperatur",
+        "mrożon",
+        "chłodz",
+        "temperatura"
+      ],
+      "kind" : "outOfScope"
+    },
+    {
+      "answer" : {
+        "values" : {
+          "en" : "This procedure does not cover operating powered equipment or how to get certified.",
+          "nb" : "Denne prosedyren dekker ikke kjøring av motorisert utstyr eller sertifisering.",
+          "pl" : "Ta procedura nie obejmuje obsługi sprzętu z napędem ani zdobywania uprawnień."
+        }
+      },
+      "id" : "X2",
+      "keywords" : [
+        "forklift",
+        "truck licence",
+        "license",
+        "certificate",
+        "certified operator",
+        "drive the",
+        "truckførerbevis",
+        "truckfører",
+        "sertifikat",
+        "wózek widłowy",
+        "uprawnienia",
+        "certyfikat"
+      ],
+      "kind" : "outOfScope"
+    }
+  ],
+  "id" : "demo-inbound-pallet",
+  "languages" : [
+    "en",
+    "nb",
+    "pl"
+  ],
+  "sourceLanguage" : "en",
+  "steps" : [
+    {
+      "id" : "S1",
+      "instruction" : {
+        "values" : {
+          "en" : "Put on safety shoes, a high-visibility vest and cut-resistant gloves. Wait at the yellow line until the dock light above Dock B is green.",
+          "nb" : "Ta på vernesko, refleksvest og kuttsikre hansker. Vent ved den gule linjen til portlyset over port B er grønt.",
+          "pl" : "Załóż obuwie ochronne, kamizelkę odblaskową i rękawice antyprzecięciowe. Czekaj przy żółtej linii, aż światło nad rampą B będzie zielone."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Prepare and wait for the green dock light",
+          "nb" : "Gjør deg klar og vent på grønt portlys",
+          "pl" : "Przygotuj się i poczekaj na zielone światło rampy"
+        }
+      },
+      "warnings" : [
+        {
+          "id" : "W1",
+          "severity" : "critical",
+          "text" : {
+            "values" : {
+              "en" : "Never enter the dock area while a truck is reversing. Wait for the green dock light.",
+              "nb" : "Gå aldri inn i portområdet mens en lastebil rygger. Vent på grønt portlys.",
+              "pl" : "Nigdy nie wchodź na rampę, gdy ciężarówka cofa. Poczekaj na zielone światło."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id" : "S2",
+      "instruction" : {
+        "values" : {
+          "en" : "Scan the delivery note barcode with the handheld scanner. The scanner shows whether the delivery is on today's expected inbound list.",
+          "nb" : "Skann strekkoden på følgeseddelen med håndskanneren. Skanneren viser om leveransen står på dagens liste over forventede leveranser.",
+          "pl" : "Zeskanuj kod kreskowy z dokumentu dostawy skanerem ręcznym. Skaner pokaże, czy dostawa jest na dzisiejszej liście oczekiwanych dostaw."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Check the delivery against the expected list",
+          "nb" : "Kontroller leveransen mot forventet liste",
+          "pl" : "Sprawdź dostawę z listą oczekiwanych dostaw"
+        }
+      },
+      "warnings" : [
+        {
+          "id" : "W2",
+          "severity" : "caution",
+          "text" : {
+            "values" : {
+              "en" : "If the delivery is not on the list, do not unload. Call the shift lead.",
+              "nb" : "Hvis leveransen ikke står på listen, skal du ikke losse. Ring skiftlederen.",
+              "pl" : "Jeśli dostawy nie ma na liście, nie rozładowuj. Zadzwoń do kierownika zmiany."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id" : "S3",
+      "instruction" : {
+        "values" : {
+          "en" : "Walk around the pallet. Look for torn stretch wrap, crushed corners, wet cardboard or leaks. Take a photo of any damage with the scanner.",
+          "nb" : "Gå rundt pallen. Se etter revnet strekkfilm, knuste hjørner, våt papp eller lekkasjer. Ta bilde av eventuelle skader med skanneren.",
+          "pl" : "Obejdź paletę dookoła. Sprawdź, czy folia nie jest rozdarta, rogi zgniecione, karton mokry lub czy nic nie wycieka. Zrób zdjęcie uszkodzeń skanerem."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Inspect the pallet before moving it",
+          "nb" : "Inspiser pallen før du flytter den",
+          "pl" : "Obejrzyj paletę przed jej przeniesieniem"
+        }
+      },
+      "warnings" : [
+        {
+          "id" : "W3",
+          "severity" : "critical",
+          "text" : {
+            "values" : {
+              "en" : "If you see a leak or notice a strong smell, stop, step back and alert the shift lead. Do not touch the liquid.",
+              "nb" : "Hvis du ser en lekkasje eller kjenner sterk lukt: stopp, gå unna og varsle skiftlederen. Ikke berør væsken.",
+              "pl" : "Jeśli widzisz wyciek lub czujesz silny zapach: zatrzymaj się, odsuń i powiadom kierownika zmiany. Nie dotykaj cieczy."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id" : "S4",
+      "instruction" : {
+        "values" : {
+          "en" : "Use the hand pallet jack to move the pallet into the inspection lane marked with yellow lines. Lower the forks fully before leaving the pallet.",
+          "nb" : "Bruk jekketralla til å flytte pallen inn i inspeksjonsfeltet merket med gule linjer. Senk gaflene helt før du forlater pallen.",
+          "pl" : "Użyj ręcznego wózka paletowego, aby przewieźć paletę na pole kontroli oznaczone żółtymi liniami. Opuść całkowicie widły, zanim odejdziesz od palety."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Move the pallet to the inspection lane",
+          "nb" : "Flytt pallen til inspeksjonsfeltet",
+          "pl" : "Przewieź paletę na pole kontroli"
+        }
+      },
+      "warnings" : [
+        {
+          "id" : "W4",
+          "severity" : "critical",
+          "text" : {
+            "values" : {
+              "en" : "Never stand or walk under a raised load.",
+              "nb" : "Stå eller gå aldri under en hevet last.",
+              "pl" : "Nigdy nie stój ani nie przechodź pod podniesionym ładunkiem."
+            }
+          }
+        },
+        {
+          "id" : "W5",
+          "severity" : "caution",
+          "text" : {
+            "values" : {
+              "en" : "The hand pallet jack is rated for 1,000 kg. Heavier pallets must be moved with powered equipment by a certified operator.",
+              "nb" : "Jekketralla er godkjent for 1 000 kg. Tyngre paller skal flyttes med motorisert utstyr av en sertifisert fører.",
+              "pl" : "Ręczny wózek paletowy ma udźwig 1000 kg. Cięższe palety musi przewieźć certyfikowany operator sprzętem z napędem."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id" : "S5",
+      "instruction" : {
+        "values" : {
+          "en" : "Scan the pallet label (SSCC). If the scanner asks for it, scan each carton label too. If a label cannot be read, type the number manually and mark it as \"label damaged\".",
+          "nb" : "Skann pallelappen (SSCC). Hvis skanneren ber om det, skanner du også hver kartong. Hvis en lapp ikke kan leses, taster du nummeret manuelt og merker den som «skadet lapp».",
+          "pl" : "Zeskanuj etykietę palety (SSCC). Jeśli skaner o to poprosi, zeskanuj też etykietę każdego kartonu. Jeśli etykiety nie da się odczytać, wpisz numer ręcznie i oznacz ją jako „uszkodzona etykieta”."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Scan the pallet label",
+          "nb" : "Skann pallelappen",
+          "pl" : "Zeskanuj etykietę palety"
+        }
+      },
+      "warnings" : [
+
+      ]
+    },
+    {
+      "id" : "S6",
+      "instruction" : {
+        "values" : {
+          "en" : "Count the cartons and compare with the quantity shown on the scanner. Record any shortage, surplus or damage in the scanner, with a photo.",
+          "nb" : "Tell kartongene og sammenlign med antallet som vises på skanneren. Registrer mangler, overskudd eller skader i skanneren, med bilde.",
+          "pl" : "Policz kartony i porównaj z ilością pokazaną na skanerze. Zapisz w skanerze każdy brak, nadwyżkę lub uszkodzenie, ze zdjęciem."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Count cartons and record differences",
+          "nb" : "Tell kartonger og registrer avvik",
+          "pl" : "Policz kartony i zapisz rozbieżności"
+        }
+      },
+      "warnings" : [
+
+      ]
+    },
+    {
+      "id" : "S7",
+      "instruction" : {
+        "values" : {
+          "en" : "Print the put-away label and attach it on two sides of the pallet. Leave the pallet in the staging area marked with the zone letter shown on the scanner.",
+          "nb" : "Skriv ut plasseringslappen og fest den på to sider av pallen. Sett pallen i buffersonen merket med sonebokstaven som vises på skanneren.",
+          "pl" : "Wydrukuj etykietę rozmieszczenia i przyklej ją na dwóch bokach palety. Zostaw paletę w strefie buforowej oznaczonej literą strefy pokazaną na skanerze."
+        }
+      },
+      "title" : {
+        "values" : {
+          "en" : "Label and place in staging",
+          "nb" : "Merk og sett i buffersonen",
+          "pl" : "Oznacz i odstaw do strefy buforowej"
+        }
+      },
+      "warnings" : [
+        {
+          "id" : "W6",
+          "severity" : "caution",
+          "text" : {
+            "values" : {
+              "en" : "Keep fire exits and yellow walkways clear. Never leave a pallet in a walkway.",
+              "nb" : "Hold nødutganger og gule gangveier frie. Sett aldri en pall i en gangvei.",
+              "pl" : "Utrzymuj wyjścia ewakuacyjne i żółte ciągi piesze wolne. Nigdy nie zostawiaj palety na przejściu."
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "title" : {
+    "values" : {
+      "en" : "Receiving an inbound pallet at Dock B",
+      "nb" : "Mottak av innkommende pall ved port B",
+      "pl" : "Przyjęcie palety przychodzącej przy rampie B"
+    }
+  },
+  "version" : "demo-0.1"
+}

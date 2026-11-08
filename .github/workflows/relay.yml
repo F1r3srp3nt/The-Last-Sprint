@@ -1,0 +1,142 @@
+name: Relay
+
+on:
+  pull_request:
+    paths:
+      - "relay/**"
+      - ".github/workflows/relay.yml"
+      - ".github/scripts/**"
+  push:
+    branches: [main]
+    paths:
+      - "relay/**"
+      - ".github/workflows/relay.yml"
+      - ".github/scripts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: relay-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: relay
+
+jobs:
+  linux:
+    name: Linux — core, adapters, runner
+    runs-on: ubuntu-24.04
+    container: swift:6.0-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trust checkout (container runs as a different user)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Toolchain
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: Runner smoke tests (simulation only; no network)
+        run: |
+          BIN="$(swift build --show-bin-path)/relay-runner"
+          "$BIN" wybe-sim --shifts 3 --faults harsh | tee sim.log
+          grep -q "SIMULATED average" sim.log
+          set +e; "$BIN" wybe-live; status=$?; set -e
+          test "$status" -eq 2
+          ./scripts/demo-warehouse.sh | tee warehouse.log
+          grep -q "Escalation: How do I handle frozen goods?" warehouse.log
+      - name: No credentials in tracked files
+        run: ./scripts/check-no-secrets.sh
+
+  macos:
+    name: macOS — includes SwiftUI app target
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+      - name: Prerequisites (build, package and test)
+        run: bash scripts/check-prereqs.sh --tests
+      # Testing and packaging are separate commands; packaging never compiles the test targets.
+      - name: Build and test (scripts/test.sh)
+        run: bash scripts/test.sh
+      - name: Package Relay.app (scripts/build-app.sh)
+        run: bash scripts/build-app.sh
+      - name: Launch check (opens the packaged app)
+        run: bash ../.github/scripts/launch-check.sh build/Relay.app 8
+      - name: Self-check (the running app reports its bundle, Info.plist commit and windows)
+        run: bash ../.github/scripts/self-check.sh build/Relay.app
+      # Window captures of the built app, for checking the look without a Mac. Download them from the
+      # run's Artifacts. Not a test: a capture problem doesn't fail the job.
+      - name: Screenshots
+        continue-on-error: true
+        env:
+          WINDOW_ID: ${{ runner.temp }}/window-id
+        run: |
+          swiftc -O ../.github/scripts/window-id.swift -o "$WINDOW_ID"
+          mkdir -p screenshots
+          shot() { ../.github/scripts/app-screenshot.sh build/Relay.app "screenshots/$1.png" "${@:2}"; }
+          n=1
+          for section in assistant tasks training wybe activity settings; do
+            shot "$(printf %02d $n)-$section" --screenshot-section "$section"
+            n=$((n + 1))
+          done
+          shot 07-settings-light --screenshot-section settings -appearance Light
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-screenshots
+          path: relay/screenshots/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Zip Relay.app (ditto keeps the bundle and its signature intact)
+        run: ditto -c -k --keepParent build/Relay.app "build/Relay-${GITHUB_SHA::7}.zip"
+      # A downloadable test build, not a release. It is ad-hoc signed: macOS asks for confirmation the
+      # first time (Control-click › Open). Kept for 14 days.
+      - name: Upload Relay.app
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-app
+          path: relay/build/Relay-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # Reproduces a Mac where only the Command Line Tools are selected (no full Xcode), for this job only.
+  # Packaging and launching must work there; the test outcome is recorded but not required, because
+  # XCTest usually ships only with Xcode.
+  macos-clt:
+    name: macOS — Command Line Tools only (package and launch)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the Command Line Tools for this job only
+        run: |
+          if [ -x /Library/Developer/CommandLineTools/usr/bin/swift ]; then
+            echo "DEVELOPER_DIR=/Library/Developer/CommandLineTools" >> "$GITHUB_ENV"
+          else
+            echo "::error::The Command Line Tools are not installed on this runner, so this job cannot reproduce that setup."
+            exit 1
+          fi
+      - name: Prerequisites for tests (records whether XCTest is available)
+        continue-on-error: true
+        run: bash scripts/check-prereqs.sh --tests
+      - name: Tests with the Command Line Tools (outcome recorded, not required)
+        continue-on-error: true
+        run: bash scripts/test.sh
+      - name: Package Relay.app with the Command Line Tools
+        run: bash scripts/build-app.sh
+      - name: Launch check
+        run: bash ../.github/scripts/launch-check.sh build/Relay.app 8
+      - name: Self-check (the running app reports its bundle, Info.plist commit and windows)
+        run: bash ../.github/scripts/self-check.sh build/Relay.app

@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+dist/
+.DS_Store
+*.xcuserstate
+# CI screenshot output (docs/screenshots/ is committed)
+/screenshots/
