@@ -1,9 +1,96 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ProviderStatus } from '../../shared/apiTypes';
 import { api, describeError } from '../api';
 import type { ErrInfo } from '../generation';
 import { ErrorBox } from './Inspector';
 import { Modal } from './Modal';
+import { bridgeMessage, desktop, type DesktopCredentialStatus, type DesktopProvider } from '../desktop';
+
+/** Desktop app only: paste, replace or remove a provider key (stored by the OS credential store). */
+function DesktopKey({
+  provider,
+  creds,
+  onChanged,
+}: {
+  provider: DesktopProvider;
+  creds: DesktopCredentialStatus | null;
+  onChanged: (c: DesktopCredentialStatus) => void;
+}) {
+  const [value, setValue] = useState('');
+  const [replacing, setReplacing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  if (!desktop) return null;
+  const saved = creds?.providers[provider].saved ?? false;
+  const label = provider === 'anthropic' ? 'Anthropic API key' : 'ElevenLabs API key';
+  const run = async (fn: () => Promise<DesktopCredentialStatus>) => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      onChanged(await fn());
+      setValue('');
+      setReplacing(false);
+    } catch (e) {
+      setProblem(bridgeMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="desktop-key" data-testid={`desktop-key-${provider}`}>
+      {saved && !replacing ? (
+        <div className="row">
+          <span>
+            {label}: <b>saved</b> <span className="muted small">({creds?.storage.name}; never shown again)</span>
+          </span>
+          <button className="btn small" onClick={() => setReplacing(true)} disabled={busy}>
+            Replace…
+          </button>
+          <button
+            className="btn small ghost"
+            disabled={busy}
+            data-testid={`remove-key-${provider}`}
+            onClick={() => confirm(`Remove the saved ${label}?`) && void run(() => desktop!.credentials.clear(provider))}
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(() => desktop!.credentials.save(provider, value));
+          }}
+        >
+          <input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={saved ? `Paste the new ${label}` : `Paste your ${label}`}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            aria-label={label}
+            data-testid={`key-input-${provider}`}
+          />
+          <button className="btn small primary" type="submit" disabled={busy || !value.trim() || creds?.storage.secure === false} data-testid={`save-key-${provider}`}>
+            {busy ? 'Saving…' : 'Save key'}
+          </button>
+          {replacing && (
+            <button className="btn small ghost" type="button" onClick={() => setReplacing(false)}>
+              Cancel
+            </button>
+          )}
+        </form>
+      )}
+      {creds?.storage.secure === false && (
+        <div className="alert error small">Keys cannot be saved: the system credential store ({creds.storage.name}) is not available. Template mode, editing and export still work.</div>
+      )}
+      {problem && <div className="alert error small">{problem}</div>}
+      <p className="muted small">Saving stores the key and restarts the built-in server. It does not check the key: use Verify connection.</p>
+    </div>
+  );
+}
 
 function Chip({ state, yes, no, unknown }: { state: boolean | null; yes: string; no: string; unknown?: string }) {
   const cls = state === true ? 'ok' : state === false ? 'bad' : 'idle';
@@ -27,10 +114,27 @@ export function SetupDialog({ status, onStatus, onClose }: { status: ProviderSta
   };
   const g = status?.generation;
   const el = status?.elevenlabs;
+  const [creds, setCreds] = useState<DesktopCredentialStatus | null>(null);
+  useEffect(() => {
+    void desktop?.credentials.status().then(setCreds, () => setCreds(null));
+  }, []);
+  const credsChanged = async (c: DesktopCredentialStatus) => {
+    setCreds(c);
+    try {
+      onStatus(await api.status());
+    } catch {
+      /* banner shows the server state */
+    }
+  };
 
   return (
     <Modal title="Setup & providers" onClose={onClose} wide>
-      {!status && <div className="alert error">Cannot reach the local server. Start it with <code>npm run dev</code> in <code>presentation-studio/</code>.</div>}
+      {!status &&
+        (desktop ? (
+          <div className="alert error">The built-in server is not responding. Keys can still be saved; use Restart server in the banner afterwards.</div>
+        ) : (
+          <div className="alert error">Cannot reach the local server. Start it with <code>npm run dev</code> in <code>presentation-studio/</code>.</div>
+        ))}
       {err && <ErrorBox err={err} />}
       <div className="setup-grid">
         <section className="card">
@@ -64,11 +168,20 @@ export function SetupDialog({ status, onStatus, onClose }: { status: ProviderSta
               </a>
               .
             </li>
-            <li>
-              Put it in <code>presentation-studio/.env</code> as <code>ANTHROPIC_API_KEY=…</code> (copy <code>.env.example</code>).
-            </li>
-            <li>Restart the server, then click <b>Verify connection</b>.</li>
+            {desktop ? (
+              <li>
+                Paste it below and click <b>Save key</b>, then <b>Verify connection</b>.
+              </li>
+            ) : (
+              <>
+                <li>
+                  Put it in <code>presentation-studio/.env</code> as <code>ANTHROPIC_API_KEY=…</code> (copy <code>.env.example</code>).
+                </li>
+                <li>Restart the server, then click <b>Verify connection</b>.</li>
+              </>
+            )}
           </ol>
+          <DesktopKey provider="anthropic" creds={creds} onChanged={credsChanged} />
           <p className="muted small">
             When you generate, your brief and downscaled copies of your images go to Anthropic. API usage is billed to that key. Without a key, template mode, editing and
             export still work.
@@ -131,8 +244,17 @@ export function SetupDialog({ status, onStatus, onClose }: { status: ProviderSta
               credit balance). Consider setting a credit limit on the key.
             </li>
             <li>
-              Put it in <code>presentation-studio/.env</code> as <code>ELEVENLABS_API_KEY=…</code> and restart the server. The key stays on the server: it is never sent to
-              the browser, saved in projects or exports, or logged.
+              {desktop ? (
+                <>
+                  Paste it below and click <b>Save key</b>. It is encrypted by {creds?.storage.name ?? 'the system credential store'} and only the built-in server uses it: it is
+                  never shown to the app window, saved in projects or exports, or logged.
+                </>
+              ) : (
+                <>
+                  Put it in <code>presentation-studio/.env</code> as <code>ELEVENLABS_API_KEY=…</code> and restart the server. The key stays on the server: it is never sent to
+                  the browser, saved in projects or exports, or logged.
+                </>
+              )}
             </li>
             <li>
               Click <b>Verify connection</b>. Then pick a voice under <b>Narration</b>. To use other voices, add them to <i>My Voices</i> from the{' '}
@@ -142,6 +264,7 @@ export function SetupDialog({ status, onStatus, onClose }: { status: ProviderSta
               .
             </li>
           </ol>
+          <DesktopKey provider="elevenlabs" creds={creds} onChanged={credsChanged} />
           <p className="muted small">
             <b>Credits:</b> speech-to-text (spoken brief) and text-to-speech (narration) both use ElevenLabs credits. The app always asks before sending audio or text.
             Docs:{' '}

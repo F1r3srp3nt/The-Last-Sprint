@@ -10,6 +10,7 @@
 import type { ServerConfig } from './config';
 import { ApiError } from './errors';
 import type { Voice } from '../src/shared/apiTypes';
+import { keyHint } from './hints';
 
 export type FetchLike = typeof fetch;
 
@@ -56,7 +57,7 @@ export function mapElevenLabsError(httpStatus: number, body: unknown, context: '
     return new ApiError(403, 'elevenlabs_permission', `The ElevenLabs API key does not have the "${permissionFor[context]}" permission.`, false, `Edit the key's permissions at ${KEYS_URL}, then click "Verify connection" again.`);
   }
   if (httpStatus === 401) {
-    return new ApiError(401, 'elevenlabs_auth', 'ElevenLabs rejected the API key (invalid, disabled or expired).', false, `Create a new key at ${KEYS_URL}, put it in presentation-studio/.env as ELEVENLABS_API_KEY and restart the server.`);
+    return new ApiError(401, 'elevenlabs_auth', 'ElevenLabs rejected the API key (invalid, disabled or expired).', false, `Create a new key at ${KEYS_URL}. ${keyHint('ELEVENLABS_API_KEY', 'replace')}`);
   }
   if (s.includes('voice_not_found') || (httpStatus === 404 && context === 'tts')) {
     return new ApiError(404, 'elevenlabs_voice_unavailable', 'The selected voice is not available to this account.', false, `Pick another voice from the list, or add it to "My Voices" at ${VOICES_URL}.`);
@@ -85,7 +86,7 @@ export class ElevenLabsClient {
 
   private async request(path: string, init: RequestInit, context: 'voices' | 'tts' | 'stt' | 'subscription'): Promise<Response> {
     if (!this.cfg.apiKey) {
-      throw new ApiError(503, 'elevenlabs_not_configured', 'ElevenLabs is not configured.', false, 'Add ELEVENLABS_API_KEY to presentation-studio/.env and restart the server. See "Setup" in the app.');
+      throw new ApiError(503, 'elevenlabs_not_configured', 'ElevenLabs is not configured.', false, keyHint('ELEVENLABS_API_KEY', 'add'));
     }
     let res: Response;
     try {

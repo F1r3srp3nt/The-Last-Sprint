@@ -16,6 +16,7 @@ import {
   validateSlideContent,
 } from '../src/shared/generationSchemas';
 import type { OutlineRequest, OutlineResponse, SlideRequest, SlideResponse } from '../src/shared/apiTypes';
+import { isDesktopMode, keyHint } from './hints';
 
 export interface Generator {
   outline(req: OutlineRequest): Promise<OutlineResponse>;
@@ -26,13 +27,13 @@ export interface Generator {
 export function mapAnthropicError(err: unknown): ApiError {
   if (err instanceof ApiError) return err;
   if (err instanceof Anthropic.AuthenticationError) {
-    return new ApiError(401, 'generation_auth', 'The generation provider rejected the API key.', false, 'Check ANTHROPIC_API_KEY in presentation-studio/.env and restart the server.');
+    return new ApiError(401, 'generation_auth', 'The generation provider rejected the API key.', false, keyHint('ANTHROPIC_API_KEY', 'check'));
   }
   if (err instanceof Anthropic.PermissionDeniedError) {
     return new ApiError(403, 'generation_permission', 'The API key is not allowed to use this model.', false, 'Check the key\'s workspace permissions or set ANTHROPIC_MODEL to a model you can use.');
   }
   if (err instanceof Anthropic.NotFoundError) {
-    return new ApiError(404, 'generation_model', 'The configured model was not found.', false, 'Check ANTHROPIC_MODEL in .env.');
+    return new ApiError(404, 'generation_model', 'The configured model was not found.', false, isDesktopMode() ? 'The desktop app uses the default model; check that your key can use it.' : 'Check ANTHROPIC_MODEL in .env.');
   }
   if (err instanceof Anthropic.RateLimitError) {
     return new ApiError(429, 'generation_rate_limited', 'The generation provider is rate limiting requests.', true, 'Wait a moment and retry.');

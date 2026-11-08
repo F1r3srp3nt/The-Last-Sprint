@@ -21,6 +21,10 @@ These are **browser screenshots**: Chromium driven by Playwright in the end-to-e
 - Captured on 8 November 2026 (about 03:47 UTC) in headless Chromium at 1440×900.
 - The images are unedited copies of the CI artifact (`a2-editor.png`, `b4-present.png`).</sub>
 
+## Desktop app
+
+Presentation Studio also runs as a standalone desktop app: `Presentation Studio.app`, opened by double-click, with its own window. It needs no Terminal, browser, npm or Node.js on the user's Mac. Keys are entered in the app's Setup and stored with the macOS Keychain. See [`docs/DESKTOP.md`](docs/DESKTOP.md) for how it works, the security model, and how to build the Apple Silicon `.app` and DMG (`npm run desktop:dist:mac`). The app is ad-hoc signed only, not notarised.
+
 **Packaged builds** for the competition go in [`submissions/Presentation Studio/`](../submissions/Presentation%20Studio/README.md). Presentation Studio currently runs from source as a web app; that folder says whether any package has been uploaded.
 
 ## Quick start
@@ -68,6 +72,10 @@ Then open http://127.0.0.1:8787.
 | `npm run test:e2e` | Browser end-to-end test (Playwright + Chromium, mock providers) |
 | `npm run typecheck` | TypeScript only |
 | `npm run samples` | Regenerates the synthetic sample images in `samples/` |
+| `npm run desktop:dev` | Builds and opens the desktop app unpackaged (see [docs/DESKTOP.md](docs/DESKTOP.md)) |
+| `npm run desktop:pack` | Packages the desktop app for the current platform into `release/` |
+| `npm run desktop:dist:mac` | On a Mac: Apple Silicon `.app` and DMG |
+| `npm run desktop:test` | End-to-end test of the packaged desktop app |
 | `./scripts/check-no-secrets.sh` | Fails if a `.env` file or something that looks like a real API key is tracked by git |
 
 ## How it works

@@ -295,3 +295,8 @@ input[type='range'] { padding: 0; accent-color: var(--cyan); background: transpa
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Desktop app: provider key entry in Setup */
+.desktop-key { margin: 10px 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: var(--radius-s); }
+.desktop-key .row { gap: 8px; flex-wrap: wrap; }
+.desktop-key input { flex: 1 1 220px; min-width: 0; }

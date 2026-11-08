@@ -10,6 +10,7 @@ import { emptyProject, type Project } from '../shared/model';
 import { narrationStatus } from '../shared/narration';
 import { api } from './api';
 import { downloadBytes, imageForPptx } from './images';
+import { bridgeMessage, desktop } from './desktop';
 import { useGeneration } from './generation';
 import { useNarration } from './narration';
 import { useStudio } from './state';
@@ -51,6 +52,33 @@ export function App() {
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
+  // Desktop app: refresh provider status whenever the built-in server (re)starts.
+  useEffect(() => desktop?.backend.onChange((s) => s.state === 'ready' && void refreshStatus()), [refreshStatus]);
+  const [restarting, setRestarting] = useState(false);
+  async function restartServer() {
+    if (!desktop) return;
+    setRestarting(true);
+    try {
+      const s = await desktop.backend.restart();
+      if (s.state !== 'ready') toast('error', 'The built-in server did not start.', s.error ?? undefined);
+      await refreshStatus();
+    } catch (e) {
+      toast('error', `Could not restart the server: ${bridgeMessage(e)}`);
+    } finally {
+      setRestarting(false);
+    }
+  }
+
+  /** Desktop: the native save dialog. Browser: a download. Returns false when the user cancelled. */
+  async function deliver(kind: 'project' | 'pptx' | 'zip', bytes: Uint8Array | Blob, name: string, type: string): Promise<{ done: boolean; where?: string }> {
+    if (!desktop) {
+      downloadBytes(bytes, name, type);
+      return { done: true };
+    }
+    const data = bytes instanceof Blob ? new Uint8Array(await bytes.arrayBuffer()) : bytes;
+    const r = await desktop.files.save(kind, name, data);
+    return r.saved ? { done: true, where: r.fileName } : { done: false };
+  }
 
   useEffect(() => {
     const onUnload = (e: BeforeUnloadEvent) => {
@@ -64,18 +92,19 @@ export function App() {
     setBusy('save');
     try {
       const bytes = await saveProject(project, store);
-      downloadBytes(bytes, `${slugify(project.title)}${PROJECT_EXTENSION}`, 'application/zip');
+      const r = await deliver('project', bytes, `${slugify(project.title)}${PROJECT_EXTENSION}`, 'application/zip');
+      if (!r.done) return;
       markSaved();
-      toast('success', 'Project saved. It contains your images, slides and narration audio.');
+      toast('success', `Project saved${r.where ? ` as ${r.where}` : ''}. It contains your images, slides and narration audio.`);
     } catch (e) {
-      toast('error', `Could not save: ${(e as Error).message}`);
+      toast('error', `Could not save: ${bridgeMessage(e)}`);
     } finally {
       setBusy(null);
     }
   }
 
-  async function onOpen(file: File) {
-    if (dirty && !confirm('Open another project? Unsaved changes in this one will be lost.')) return;
+  async function onOpen(file: File, confirmed = false) {
+    if (!confirmed && dirty && !confirm('Open another project? Unsaved changes in this one will be lost.')) return;
     setBusy('open');
     try {
       const loaded = await loadProject(file);
@@ -86,6 +115,18 @@ export function App() {
       toast('error', (e as Error).message);
     } finally {
       setBusy(null);
+    }
+  }
+
+  /** Desktop: the native open dialog. */
+  async function openWithDialog() {
+    if (!desktop) return;
+    if (dirty && !confirm('Open another project? Unsaved changes in this one will be lost.')) return;
+    try {
+      const r = await desktop.files.openProject();
+      if (r.opened) await onOpen(new File([r.bytes as Uint8Array<ArrayBuffer>], r.fileName, { type: 'application/zip' }), true);
+    } catch (e) {
+      toast('error', `Could not open: ${bridgeMessage(e)}`);
     }
   }
 
@@ -119,14 +160,14 @@ export function App() {
     setBusy('export');
     try {
       const bytes = await pptxBytes(project);
-      if (kind === 'pptx') {
-        downloadBytes(bytes, `${slugify(project.title)}.pptx`, 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-      } else {
-        downloadBytes(await buildNarrationZip(project, bytes, store), `${slugify(project.title)}-with-narration.zip`, 'application/zip');
-      }
-      toast('success', kind === 'pptx' ? 'PowerPoint exported.' : 'PowerPoint and narration exported.');
+      const r =
+        kind === 'pptx'
+          ? await deliver('pptx', bytes, `${slugify(project.title)}.pptx`, 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+          : await deliver('zip', await buildNarrationZip(project, bytes, store), `${slugify(project.title)}-with-narration.zip`, 'application/zip');
+      if (!r.done) return;
+      toast('success', `${kind === 'pptx' ? 'PowerPoint exported' : 'PowerPoint and narration exported'}${r.where ? ` as ${r.where}` : ''}.`);
     } catch (e) {
-      toast('error', `Export failed: ${(e as Error).message}`);
+      toast('error', `Export failed: ${bridgeMessage(e)}`);
     } finally {
       setBusy(null);
     }
@@ -166,7 +207,7 @@ export function App() {
           <button className="btn ghost small" onClick={newProject}>
             New
           </button>
-          <button className="btn ghost small" onClick={() => openInput.current?.click()} disabled={busy !== null} data-testid="open-project">
+          <button className="btn ghost small" onClick={() => (desktop ? void openWithDialog() : openInput.current?.click())} disabled={busy !== null} data-testid="open-project">
             Open…
           </button>
           <input ref={openInput} type="file" accept={`${PROJECT_EXTENSION},application/zip`} hidden data-testid="open-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void onOpen(f); }} />
@@ -201,11 +242,19 @@ export function App() {
         </div>
       </header>
 
-      {status === null && (
-        <div className="banner error">
-          The local server is not reachable. Editing and export still work in this tab; generation and voice features need the server (<code>npm run dev</code>).
-        </div>
-      )}
+      {status === null &&
+        (desktop ? (
+          <div className="banner error" data-testid="server-banner">
+            The built-in server is not responding. Editing, saving and PowerPoint export still work; AI generation and voice need it.{' '}
+            <button className="btn small" onClick={() => void restartServer()} disabled={restarting}>
+              {restarting ? 'Restarting…' : 'Restart server'}
+            </button>
+          </div>
+        ) : (
+          <div className="banner error">
+            The local server is not reachable. Editing and export still work in this tab; generation and voice features need the server (<code>npm run dev</code>).
+          </div>
+        ))}
 
       <div className="content">
         {step === 'sources' && <SourcesStep onNext={() => setStep('brief')} />}
