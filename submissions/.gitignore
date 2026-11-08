@@ -1,0 +1,27 @@
+# Packaged submissions only. Keep secrets and build leftovers out of this folder.
+# Credentials and environment files
+.env
+.env.*
+*.pem
+*.p8
+*.p12
+*.pfx
+*.cer
+*.crt
+*.der
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+*.keystore
+*.jks
+# Caches and dependencies
+node_modules/
+.DS_Store
+__MACOSX/
+# Intermediate build output
+.build/
+.swiftpm/
+DerivedData/
+*.o
+*.obj
+*.xcarchive/
