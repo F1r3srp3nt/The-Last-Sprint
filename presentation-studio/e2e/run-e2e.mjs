@@ -114,6 +114,26 @@ try {
     assert.equal(await page.isDisabled('[data-testid=generate-ai]'), true);
     assert.match(await page.locator('.spoken').innerText(), /not configured/);
   });
+  await step('slide count: typing replaces the value; a count in the brief must be resolved first', async () => {
+    // Clearing the box used to store 1, so typing "3" gave 13.
+    await page.fill('[data-testid=slide-count]', '');
+    await page.locator('[data-testid=slide-count]').pressSequentially('3');
+    assert.equal(await page.inputValue('[data-testid=slide-count]'), '3');
+    await page.fill('[data-testid=slide-count]', '6');
+    const brief = await page.inputValue('[data-testid=brief]');
+    await page.fill('[data-testid=brief]', `${brief}\nKeep it to three slides`);
+    await page.locator('[data-testid=slide-count-conflict]').waitFor();
+    assert.match(await page.locator('[data-testid=slide-count-conflict]').innerText(), /three slides/);
+    assert.equal(await page.isDisabled('[data-testid=generate-template]'), true);
+    await page.click('[data-testid=use-count-3]');
+    assert.equal(await page.inputValue('[data-testid=slide-count]'), '3');
+    assert.equal(await page.locator('[data-testid=slide-count-conflict]').count(), 0);
+    await page.fill('[data-testid=slide-count]', '6');
+    await page.click('[data-testid=keep-count]');
+    assert.equal(await page.locator('[data-testid=slide-count-conflict]').count(), 0);
+    assert.equal(await page.isDisabled('[data-testid=generate-template]'), false);
+    await page.fill('[data-testid=brief]', brief);
+  });
   await step('build template deck (labelled, no AI)', async () => {
     await page.click('[data-testid=generate-template]');
     await page.locator('[data-testid=slide-thumb]').nth(5).waitFor();
@@ -193,6 +213,22 @@ try {
     assert.equal(await page2.locator('[data-testid=gallery-item]').nth(0).getByPlaceholder('What does this image show?').inputValue(), 'Synthetic sketch of a bike dock');
     await page2.close();
   });
+  await step('restyle deck without AI, then undo: text and notes unchanged', async () => {
+    const titles = await thumbLabels(page);
+    await selectSlide(page, 3);
+    const notes = await page.inputValue('[data-testid=field-notes]');
+    await page.click('[data-testid=restyle-open]');
+    await page.click('[data-testid=restyle-theme-executive-dark]');
+    await page.click('[data-testid=restyle-apply]');
+    await page.locator('[data-testid=restyle-banner]').waitFor();
+    assert.deepEqual(await thumbLabels(page), titles);
+    await selectSlide(page, 3);
+    assert.equal(await page.inputValue('[data-testid=field-notes]'), notes);
+    await page.screenshot({ path: join(out, 'a3-restyled.png') });
+    await page.click('[data-testid=restyle-undo]');
+    assert.equal(await page.locator('[data-testid=restyle-banner]').count(), 0);
+    assert.deepEqual(await thumbLabels(page), titles);
+  });
   let pptxA;
   await step('export .pptx (narration ZIP not offered without narration)', async () => {
     await page.click('[data-testid=export]');
@@ -262,6 +298,13 @@ try {
   await step('AI generation with disclosure, progress and validation', async () => {
     assert.match(await b.locator('[data-testid=data-notice]').innerText(), /sent to\s+Anthropic/);
     await b.fill('[data-testid=slide-count]', '5');
+    const brief = await b.inputValue('[data-testid=brief]');
+    await b.fill('[data-testid=brief]', `${brief}\nA 3-slide deck is enough`);
+    await b.locator('[data-testid=slide-count-conflict]').waitFor();
+    assert.equal(await b.isDisabled('[data-testid=generate-ai]'), true, 'no paid request while the count is unresolved');
+    assert.equal(mocks.calls.anthropic.filter((c) => c.path === '/v1/messages').length, 0);
+    await b.fill('[data-testid=brief]', brief);
+    assert.equal(await b.locator('[data-testid=slide-count-conflict]').count(), 0);
     await b.click('[data-testid=generate-ai]');
     await b.getByText('Write slides (5/5)').waitFor({ timeout: 20000 });
     await b.screenshot({ path: join(out, 'b2-generated.png') });

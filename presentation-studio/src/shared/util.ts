@@ -38,3 +38,26 @@ export function pad2(n: number): string {
 export function bytesToBlob(bytes: Uint8Array, type: string): Blob {
   return new Blob([bytes as Uint8Array<ArrayBuffer>], { type });
 }
+
+/** Normalised form used to spot repeated messages ("No figures were given." vs "no figures were given"). */
+function messageKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[“”"'`]/g, '')
+    .replace(/[\s.!,;:]+/g, ' ')
+    .trim();
+}
+
+/** Drops empty and repeated messages, keeping the first wording and the original order. */
+export function uniqueMessages(messages: readonly string[], alreadyShown: readonly string[] = []): string[] {
+  const seen = new Set(alreadyShown.map(messageKey));
+  const out: string[] = [];
+  for (const m of messages) {
+    const text = m.trim();
+    const key = messageKey(text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}

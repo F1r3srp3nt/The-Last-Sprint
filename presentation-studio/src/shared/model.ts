@@ -6,8 +6,11 @@ import { z } from 'zod';
 
 export const LAYOUT_IDS = [
   'title',
-  'imageCaption',
+  'bullets',
+  'cards',
+  'process',
   'textImage',
+  'imageCaption',
   'fullImage',
   'comparison',
   'takeaway',
@@ -17,6 +20,9 @@ export type LayoutId = (typeof LAYOUT_IDS)[number];
 
 export const LAYOUT_LABELS: Record<LayoutId, string> = {
   title: 'Title',
+  bullets: 'Key points (text only)',
+  cards: 'Feature cards',
+  process: 'Workflow / steps',
   imageCaption: 'Image with caption',
   textImage: 'Text + image',
   fullImage: 'Full image',
@@ -60,8 +66,13 @@ export type NarrationRef = z.infer<typeof NarrationRefSchema>;
 export const SlideSchema = z.object({
   id: z.string().min(1),
   layout: z.enum(LAYOUT_IDS),
+  /** Short eyebrow label above the title (e.g. a section name). Optional; added after version 1 files, so it defaults to "". */
+  kicker: z.string().default(''),
   title: z.string(),
-  /** Bullets or paragraph text. One paragraph per line. Also the subtitle on title slides. */
+  /**
+   * Bullets or paragraph text. One paragraph per line. Also the subtitle on title slides.
+   * Cards and workflow slides use one item per line, written "Label — detail".
+   */
   body: z.string(),
   caption: z.string(),
   leftHeading: z.string(),
@@ -101,12 +112,29 @@ export const BriefSchema = z.object({
 });
 export type Brief = z.infer<typeof BriefSchema>;
 
+/**
+ * What an AI run has already produced, so a retry continues instead of paying for the whole deck again.
+ * `outline` is validated with OutlineSchema (generationSchemas.ts) when it is used.
+ */
+export const GenerationResumeSchema = z.object({
+  /** Fingerprint of the brief and images the outline was planned from. */
+  briefKey: z.string(),
+  outline: z.unknown(),
+  /** Slide id for each outline entry, in outline order. */
+  slideIds: z.array(z.string()),
+  /** Slide ids whose content has not been written yet (pending or failed). */
+  pending: z.array(z.string()),
+});
+export type GenerationResume = z.infer<typeof GenerationResumeSchema>;
+
 export const GenerationInfoSchema = z.object({
   mode: z.enum(['ai', 'template', 'manual']),
   provider: z.string().nullable(),
   model: z.string().nullable(),
   generatedAt: z.string().nullable(),
   missingInfo: z.array(z.string()),
+  /** Added after version 1 files; absent means nothing to resume. */
+  resume: GenerationResumeSchema.nullable().default(null),
 });
 export type GenerationInfo = z.infer<typeof GenerationInfoSchema>;
 
@@ -157,7 +185,7 @@ export function emptyProject(): Project {
     brief: emptyBrief(),
     assets: [],
     slides: [],
-    generation: { mode: 'manual', provider: null, model: null, generatedAt: null, missingInfo: [] },
+    generation: { mode: 'manual', provider: null, model: null, generatedAt: null, missingInfo: [], resume: null },
     narration: { voiceId: null, voiceName: null, modelId: null },
   };
 }
@@ -166,6 +194,7 @@ export function newSlide(id: string, layout: LayoutId, origin: SlideOrigin, part
   return {
     id,
     layout,
+    kicker: '',
     title: '',
     body: '',
     caption: '',
@@ -188,3 +217,7 @@ export function defaultPlacement(assetId: string, layout: LayoutId): ImagePlacem
 
 /** Layouts that have an image frame. */
 export const IMAGE_LAYOUTS: ReadonlySet<LayoutId> = new Set(['title', 'imageCaption', 'textImage', 'fullImage']);
+/** Layouts that cannot work without an image. */
+export const IMAGE_REQUIRED_LAYOUTS: ReadonlySet<LayoutId> = new Set(['imageCaption', 'fullImage']);
+/** Layouts whose content is the title plus the body lines, so one can switch between them without losing text. */
+export const BODY_LAYOUTS: ReadonlySet<LayoutId> = new Set(['bullets', 'cards', 'process', 'textImage', 'closing']);

@@ -6,23 +6,75 @@
  */
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { Project, Slide } from '../../shared/model';
-import { renderSlide, SLIDE_H, SLIDE_W, type RenderedSlide, type SlideElement } from '../../shared/render';
+import { renderSlide, SLIDE_H, SLIDE_W, type RenderedSlide, type ShapeElement, type SlideElement } from '../../shared/render';
 import { getTheme } from '../../shared/themes';
 import { blobUrl } from '../images';
 import { useStudio } from '../state';
 
 const pct = (v: number, total: number) => `${(v / total) * 100}%`;
 const pt = (v: number) => `calc(${v} * var(--pt))`;
+/** Inches to the preview's point unit (1 in = 72 pt). */
+const inch = (v: number) => pt(v * 72);
+/** PptxGenJS transparency (0 opaque … 100 invisible) as a CSS colour. */
+function rgba(hex: string, transparency = 0): string {
+  const n = parseInt(hex, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${(100 - transparency) / 100})`;
+}
+
+/** Native PowerPoint shapes, drawn with the same geometry (hexagon: corners cut at a quarter of the shorter side, as in PowerPoint's preset). */
+function Shape({ el }: { el: ShapeElement }) {
+  const box = { left: pct(el.x, SLIDE_W), top: pct(el.y, SLIDE_H), width: pct(el.w, SLIDE_W), height: pct(el.h, SLIDE_H) };
+  const stroke = el.line ? rgba(el.line.color, el.line.transparency) : 'transparent';
+  if (el.shape === 'line') {
+    const width = el.line?.width ?? 1;
+    const horizontal = el.h === 0;
+    return (
+      <div
+        className="sc-shape"
+        style={{
+          left: pct(el.x, SLIDE_W),
+          top: pct(el.y, SLIDE_H),
+          width: horizontal ? pct(el.w, SLIDE_W) : pt(width),
+          height: horizontal ? pt(width) : pct(el.h, SLIDE_H),
+          transform: horizontal ? 'translateY(-50%)' : 'translateX(-50%)',
+          background: stroke,
+        }}
+      />
+    );
+  }
+  if (el.shape === 'hexagon') {
+    const W = el.w * 100;
+    const H = el.h * 100;
+    const a = Math.min(W, H) * 0.25;
+    return (
+      <svg className="sc-shape" style={box} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+        <polygon
+          points={`${a},0 ${W - a},0 ${W},${H / 2} ${W - a},${H} ${a},${H} 0,${H / 2}`}
+          fill={el.fill ? rgba(el.fill, el.fillTransparency) : 'none'}
+          stroke={stroke}
+          style={{ strokeWidth: el.line ? pt(el.line.width) : 0 }}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    );
+  }
+  return (
+    <div
+      className="sc-shape"
+      style={{
+        ...box,
+        background: el.fill ? rgba(el.fill, el.fillTransparency) : 'transparent',
+        boxShadow: el.line ? `inset 0 0 0 ${pt(el.line.width)} ${stroke}` : undefined,
+        borderRadius: el.shape === 'ellipse' ? '50%' : el.shape === 'roundRect' ? inch(el.radius) : 0,
+      }}
+    />
+  );
+}
 
 function Element({ el, urls, showPlaceholders }: { el: SlideElement; urls: Map<string, string | undefined>; showPlaceholders: boolean }) {
   switch (el.kind) {
-    case 'rect':
-      return (
-        <div
-          className="sc-rect"
-          style={{ left: pct(el.x, SLIDE_W), top: pct(el.y, SLIDE_H), width: pct(el.w, SLIDE_W), height: pct(el.h, SLIDE_H), background: `#${el.color}`, opacity: (100 - el.transparency) / 100 }}
-        />
-      );
+    case 'shape':
+      return <Shape el={el} />;
     case 'image': {
       const { frame, draw } = el.geometry;
       const url = urls.get(el.assetId);
@@ -62,6 +114,7 @@ function Element({ el, urls, showPlaceholders }: { el: SlideElement; urls: Map<s
             fontStyle: el.italic ? 'italic' : 'normal',
             textAlign: el.align,
             lineHeight: el.lineHeight,
+            letterSpacing: el.charSpacing ? pt(el.charSpacing) : undefined,
           }}
         >
           <div className="sc-text-inner">
@@ -77,7 +130,12 @@ function Element({ el, urls, showPlaceholders }: { el: SlideElement; urls: Map<s
 }
 
 export function useRenderedSlide(project: Project, slide: Slide): RenderedSlide {
-  return useMemo(() => renderSlide(slide, getTheme(project.themeId), project.assets), [slide, project.themeId, project.assets]);
+  const index = project.slides.findIndex((s) => s.id === slide.id);
+  const total = project.slides.length;
+  return useMemo(
+    () => renderSlide(slide, getTheme(project.themeId), project.assets, index >= 0 ? { index, total } : undefined),
+    [slide, project.themeId, project.assets, index, total],
+  );
 }
 
 export function SlideCanvas({

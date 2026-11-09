@@ -90,6 +90,7 @@ export async function startMockProviders({ anthropicKey = 'test-anthropic-key', 
       const n = plan.slideNumber ?? 1;
       return send(res, 200, message(req2.model, {
         layout: p.layout,
+        kicker: '',
         title: regenerate ? `[MOCK] Rewritten slide ${n}${request ? ` (${request})` : ''}` : p.title,
         body: p.layout === 'title' ? '[MOCK] Subtitle' : p.layout === 'closing' ? '[MOCK] Questions?' : '[MOCK] First point\n[MOCK] Second point',
         caption: p.layout === 'imageCaption' ? '[MOCK] Caption' : '',

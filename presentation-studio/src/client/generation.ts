@@ -9,10 +9,13 @@ import { imageForModel } from './images';
 import { useStudio } from './state';
 import type { GenerationImage } from '../shared/apiTypes';
 import type { ImageNote, Outline, OutlineSlide, SlideContent } from '../shared/generationSchemas';
+import { briefKey, resumeInfo } from '../shared/resume';
 import type { Asset, BinaryStore, Project, Slide } from '../shared/model';
 import { slideFromContent, slideFromOutline } from '../shared/deckBuild';
 import { toParagraphs } from '../shared/textFit';
-import { newId } from '../shared/util';
+import { newId, uniqueMessages } from '../shared/util';
+
+export { briefKey, resumeInfo, type ResumeInfo } from '../shared/resume';
 
 export interface ErrInfo {
   message: string;
@@ -51,6 +54,7 @@ async function prepareImages(assets: Asset[], store: BinaryStore, ids?: string[]
 function slideToContent(s: Slide): SlideContent {
   return {
     layout: s.layout,
+    kicker: s.kicker,
     title: s.title,
     body: s.body,
     caption: s.caption,
@@ -107,10 +111,14 @@ export function useGeneration() {
         );
         if (cancelled.current) return;
         updateSlide(job.slideId, (s) => {
-          Object.assign(s, slideFromContent(res.content, s.id, s));
+          Object.assign(s, slideFromContent(res.content, s.id, s, outline.missingInfo));
+        });
+        // Remember that this slide is written, so a retry or a reload never pays for it again.
+        update((d) => {
+          if (d.generation.resume) d.generation.resume.pending = d.generation.resume.pending.filter((id) => id !== job.slideId);
         });
         setJob(job.slideId, { status: 'done', title: res.content.title });
-        if (res.notices.length) setState((s) => ({ ...s, notices: [...s.notices, ...res.notices] }));
+        if (res.notices.length) setState((s) => ({ ...s, notices: uniqueMessages([...s.notices, ...res.notices]) }));
       } catch (err) {
         setJob(job.slideId, { status: 'error', error: describeError(err) });
         updateSlide(job.slideId, (s) => {
@@ -118,8 +126,58 @@ export function useGeneration() {
         });
       }
     },
-    [updateSlide],
+    [updateSlide, update],
   );
+
+  /** Writes the given outline entries two at a time; the rest of the deck is left alone. */
+  const runJobs = useCallback(
+    async (jobs: SlideJob[], outline: Outline) => {
+      let next = 0;
+      const todo = jobs.filter((j) => j.status !== 'done');
+      const worker = async () => {
+        while (!cancelled.current && next < todo.length) {
+          const job = todo[next++];
+          await runSlide(job, outline.slides[job.index]);
+        }
+      };
+      await Promise.all([worker(), worker()]);
+      if (!cancelled.current) setState((s) => ({ ...s, phase: 'done' }));
+    },
+    [runSlide],
+  );
+
+  const updateSlideFlagsForRetry = (jobs: SlideJob[]) => {
+    for (const j of jobs.filter((x) => x.status !== 'done')) {
+      updateSlide(j.slideId, (s) => {
+        s.flags = s.flags.filter((f) => !f.startsWith('Generation failed'));
+      });
+    }
+  };
+
+  /** Continues an earlier run: no new outline, only the slides that were not written yet. */
+  const resume = useCallback(async () => {
+    const p = projectRef.current;
+    const info = resumeInfo(p);
+    if (!info) return;
+    cancelled.current = false;
+    outlineRef.current = info.outline;
+    const jobs: SlideJob[] = info.entries.map((e) => ({
+      slideId: e.slideId,
+      index: e.index,
+      title: info.outline.slides[e.index]?.title ?? '',
+      status: e.pending ? 'pending' : 'done',
+    }));
+    setState({ phase: 'preparing', jobs, notices: [] });
+    try {
+      imagesRef.current = await prepareImages(p.assets, store);
+      if (cancelled.current) return;
+      setState((s) => ({ ...s, phase: 'slides' }));
+      updateSlideFlagsForRetry(jobs);
+      await runJobs(jobs, info.outline);
+    } catch (err) {
+      setState((s) => ({ ...s, phase: 'error', error: describeError(err) }));
+    }
+  }, [store, runJobs]);
 
   const start = useCallback(async () => {
     cancelled.current = false;
@@ -133,33 +191,33 @@ export function useGeneration() {
       if (cancelled.current) return;
       outlineRef.current = res.outline;
       const slides = res.outline.slides.map((entry) => slideFromOutline(entry, newId('slide')));
+      const ids = slides.map((s) => s.id);
       update((d) => {
         d.slides = slides;
         if (res.outline.title.trim()) d.title = res.outline.title.trim();
-        d.generation = { mode: 'ai', provider: 'anthropic', model: res.model, generatedAt: new Date().toISOString(), missingInfo: res.outline.missingInfo };
+        d.generation = {
+          mode: 'ai',
+          provider: 'anthropic',
+          model: res.model,
+          generatedAt: new Date().toISOString(),
+          missingInfo: uniqueMessages(res.outline.missingInfo),
+          resume: { briefKey: briefKey(p), outline: res.outline, slideIds: ids, pending: ids },
+        };
       });
       select(slides[0]?.id ?? null);
       const jobs: SlideJob[] = slides.map((s, i) => ({ slideId: s.id, index: i, title: s.title, status: 'pending' }));
-      setState({ phase: 'slides', jobs, notices: res.notices, model: res.model });
+      setState({ phase: 'slides', jobs, notices: uniqueMessages(res.notices), model: res.model });
       // Two slides at a time keeps progress visible without hammering rate limits.
-      let next = 0;
-      const worker = async () => {
-        while (!cancelled.current && next < jobs.length) {
-          const i = next++;
-          await runSlide(jobs[i], res.outline.slides[i]);
-        }
-      };
-      await Promise.all([worker(), worker()]);
-      if (!cancelled.current) setState((s) => ({ ...s, phase: 'done' }));
+      await runJobs(jobs, res.outline);
     } catch (err) {
       setState((s) => ({ ...s, phase: 'error', error: describeError(err) }));
     }
-  }, [store, update, select, runSlide]);
+  }, [store, update, select, runJobs]);
 
   const retrySlide = useCallback(
     async (slideId: string) => {
       const job = state.jobs.find((j) => j.slideId === slideId);
-      const outline = outlineRef.current;
+      const outline = outlineRef.current ?? resumeInfo(projectRef.current)?.outline ?? null;
       if (!job || !outline) return;
       updateSlide(slideId, (s) => {
         s.flags = s.flags.filter((f) => !f.startsWith('Generation failed'));
@@ -186,7 +244,7 @@ export function useGeneration() {
       if (index < 0) return;
       const slide = p.slides[index];
       // Context comes from the deck as it is now (the user may have reordered or edited slides); image notes from the last outline are reused.
-      const outline = { ...outlineFromDeck(p), imageNotes: outlineRef.current?.imageNotes ?? [] };
+      const outline = { ...outlineFromDeck(p), imageNotes: (outlineRef.current ?? resumeInfo(p)?.outline)?.imageNotes ?? [] };
       const imageIds = slide.image ? [slide.image.assetId] : [];
       const images = await prepareImages(p.assets, store, imageIds);
       const notes: ImageNote[] = outline.imageNotes.filter((n) => imageIds.includes(n.imageId));
@@ -206,7 +264,7 @@ export function useGeneration() {
       );
       updateSlide(slideId, (s) => {
         const narration = s.narration;
-        Object.assign(s, slideFromContent(res.content, s.id, s));
+        Object.assign(s, slideFromContent(res.content, s.id, s, p.generation.missingInfo));
         // Keep existing audio; it is marked outdated automatically if the notes changed.
         s.narration = narration;
       });
@@ -219,7 +277,7 @@ export function useGeneration() {
     [store, update, updateSlide],
   );
 
-  return { state, start, retrySlide, retryFailed, cancel, regenerateSlide };
+  return { state, start, resume, retrySlide, retryFailed, cancel, regenerateSlide };
 }
 
 export type GenerationApi = ReturnType<typeof useGeneration>;

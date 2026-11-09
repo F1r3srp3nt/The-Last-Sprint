@@ -19,6 +19,7 @@ import { Editor } from './components/Editor';
 import { NarrationDialog } from './components/NarrationDialog';
 import { PresentMode } from './components/PresentMode';
 import { SetupDialog } from './components/SetupDialog';
+import { RestyleDialog, type RestyleUndo } from './components/RestyleDialog';
 import { SourcesStep } from './components/SourcesStep';
 
 type Step = 'sources' | 'brief' | 'editor';
@@ -37,6 +38,8 @@ export function App() {
   const [narrationOpen, setNarrationOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [restyleOpen, setRestyleOpen] = useState(false);
+  const [restyleUndo, setRestyleUndo] = useState<RestyleUndo | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const openInput = useRef<HTMLInputElement>(null);
   const gen = useGeneration();
@@ -212,6 +215,9 @@ export function App() {
           <button className="btn small" onClick={onSave} disabled={busy !== null} data-testid="save-project">
             {busy === 'save' ? 'Saving…' : `Save${dirty ? ' •' : ''}`}
           </button>
+          <button className="btn small" onClick={() => setRestyleOpen(true)} disabled={project.slides.length === 0} data-testid="restyle-open" title="Change the theme and layouts without AI">
+            Restyle…
+          </button>
           <button className="btn small" onClick={() => setNarrationOpen(true)} disabled={project.slides.length === 0}>
             Narration
           </button>
@@ -254,6 +260,29 @@ export function App() {
           </div>
         ))}
 
+      {restyleUndo && (
+        <div className="banner info" data-testid="restyle-banner">
+          Deck restyled without AI. Text, speaker notes and narration are unchanged.{' '}
+          <button
+            className="btn small"
+            onClick={() => {
+              update((d) => {
+                d.themeId = restyleUndo.themeId;
+                for (const s of d.slides) if (restyleUndo.layouts[s.id]) s.layout = restyleUndo.layouts[s.id];
+              });
+              setRestyleUndo(null);
+              toast('info', 'Restyle undone.');
+            }}
+            data-testid="restyle-undo"
+          >
+            Undo restyle
+          </button>{' '}
+          <button className="btn small ghost" onClick={() => setRestyleUndo(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="content">
         {step === 'sources' && <SourcesStep onNext={() => setStep('brief')} />}
         {step === 'brief' && <BriefStep status={status} gen={gen} onOpenSetup={() => setSetupOpen(true)} onDone={() => setStep('editor')} />}
@@ -261,6 +290,24 @@ export function App() {
       </div>
 
       {setupOpen && <SetupDialog status={status} onStatus={setStatus} onClose={() => { setSetupOpen(false); void refreshStatus(); }} />}
+      {restyleOpen && (
+        <RestyleDialog
+          project={project}
+          onClose={() => setRestyleOpen(false)}
+          onApply={(themeId, changes, undo) => {
+            update((d) => {
+              d.themeId = themeId;
+              for (const c of changes) {
+                const s = d.slides.find((x) => x.id === c.slideId);
+                if (s) s.layout = c.to;
+              }
+            });
+            setRestyleUndo(undo);
+            setRestyleOpen(false);
+            toast('success', `Deck restyled${changes.length ? `: ${changes.length} layout${changes.length === 1 ? '' : 's'} changed` : ''}. No AI was used.`);
+          }}
+        />
+      )}
       {narrationOpen && <NarrationDialog status={status} narration={narration} onClose={() => setNarrationOpen(false)} onOpenSetup={() => { setNarrationOpen(false); setSetupOpen(true); }} />}
       {presenting && <PresentMode startIndex={startIndex} onExit={() => setPresenting(false)} />}
 

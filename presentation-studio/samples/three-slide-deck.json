@@ -1,0 +1,27 @@
+{
+  "_about": "Synthetic three-slide deck used to check rendering and export without any provider call. All content is invented for the tests.",
+  "title": "Fjordlight bike-share pilot",
+  "slides": [
+    {
+      "layout": "title",
+      "kicker": "Pilot proposal",
+      "title": "Fjordlight bike-share pilot",
+      "body": "A synthetic sample deck for the design tests",
+      "notes": "Introduce the pilot. This deck is synthetic test material."
+    },
+    {
+      "layout": "textImage",
+      "kicker": "How it works",
+      "title": "From station to ferry in four steps",
+      "body": "Find a bike — Stations sit next to the ferry stops\nUnlock — Scan the code on the dock\nRide — Short trips across the district\nReturn — Dock at any station near the water",
+      "notes": "Walk through the four steps a rider takes."
+    },
+    {
+      "layout": "closing",
+      "kicker": "Next steps",
+      "title": "Start with one district",
+      "body": "Agree on the pilot district\nCollect usage data for one season\nDecide on winter use",
+      "notes": "Close with the three decisions we need."
+    }
+  ]
+}
