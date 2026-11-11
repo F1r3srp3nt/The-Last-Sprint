@@ -8,7 +8,7 @@
  */
 import PptxGenJS from 'pptxgenjs';
 import type { Project } from '../shared/model';
-import { renderSlide, type ImageElement, type RectElement, type TextElement } from '../shared/render';
+import { renderSlide, type ImageElement, type ShapeElement, type TextElement } from '../shared/render';
 import { getTheme } from '../shared/themes';
 import { BULLET_INDENT_PT } from '../shared/textFit';
 
@@ -49,20 +49,29 @@ function addTextElement(slide: PptxGenJS.Slide, el: TextElement) {
     align: el.align,
     valign: el.valign,
     margin: 0,
+    charSpacing: el.charSpacing || undefined,
     fit: 'none',
     wrap: true,
     objectName: el.role,
   });
 }
 
-function addRectElement(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: RectElement) {
-  slide.addShape(pptx.ShapeType.rect, {
+function addShapeElement(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ShapeElement) {
+  const type = {
+    rect: pptx.ShapeType.rect,
+    roundRect: pptx.ShapeType.roundRect,
+    ellipse: pptx.ShapeType.ellipse,
+    hexagon: pptx.ShapeType.hexagon,
+    line: pptx.ShapeType.line,
+  }[el.shape];
+  slide.addShape(type, {
     x: el.x,
     y: el.y,
     w: el.w,
     h: el.h,
-    fill: { color: el.color, transparency: el.transparency },
-    line: { type: 'none' },
+    fill: el.fill ? { color: el.fill, transparency: el.fillTransparency } : { type: 'none' },
+    line: el.line ? { color: el.line.color, width: el.line.width, transparency: el.line.transparency } : { type: 'none' },
+    ...(el.shape === 'roundRect' ? { rectRadius: el.radius } : {}),
   });
 }
 
@@ -92,13 +101,13 @@ export async function buildPptx(project: Project, resolveImage: ImageDataResolve
   const theme = getTheme(project.themeId);
   const cache = new Map<string, string | null>();
 
-  for (const s of project.slides) {
-    const rendered = renderSlide(s, theme, project.assets);
+  for (const [index, s] of project.slides.entries()) {
+    const rendered = renderSlide(s, theme, project.assets, { index, total: project.slides.length });
     const slide = pptx.addSlide();
     slide.background = { color: rendered.background };
     for (const el of rendered.elements) {
       if (el.kind === 'text') addTextElement(slide, el);
-      else if (el.kind === 'rect') addRectElement(pptx, slide, el);
+      else if (el.kind === 'shape') addShapeElement(pptx, slide, el);
       else if (el.kind === 'image') {
         if (!cache.has(el.assetId)) cache.set(el.assetId, await resolveImage(el.assetId));
         const data = cache.get(el.assetId);

@@ -10,6 +10,7 @@ import type {
 } from '../shared/apiTypes';
 import { validateOutline, validateSlideContent } from '../shared/generationSchemas';
 import { desktop } from './desktop';
+import { uniqueMessages } from '../shared/util';
 
 const START_HINT = desktop
   ? 'The built-in server is not responding. Use "Restart server" in the banner, or quit and reopen Presentation Studio.'
@@ -66,13 +67,14 @@ export const api = {
     // Validate again in the browser before anything is rendered.
     const v = validateOutline(res.outline, { slideCount: req.brief.slideCount, assetIds: req.images.map((i) => i.id) });
     if (!v.ok || !v.value) throw new ClientApiError('invalid_output', 'The outline failed validation.', true, 'Retry generation.', v.errors);
-    return { ...res, outline: v.value, notices: [...res.notices, ...v.notices] };
+    // The server already validated; the second check only adds messages it did not report.
+    return { ...res, outline: v.value, notices: uniqueMessages([...res.notices, ...v.notices]) };
   },
   async slide(req: SlideRequest, assetIds: string[]): Promise<SlideResponse> {
     const res: SlideResponse = await (await request('/api/generate/slide', json({ ...req, assetIds }))).json();
     const v = validateSlideContent(res.content, { assetIds });
     if (!v.ok || !v.value) throw new ClientApiError('invalid_output', 'The slide failed validation.', true, 'Retry this slide.', v.errors);
-    return { ...res, content: v.value, notices: [...res.notices, ...v.notices] };
+    return { ...res, content: v.value, notices: uniqueMessages([...res.notices, ...v.notices]) };
   },
   async voices(): Promise<Voice[]> {
     return (await (await request('/api/elevenlabs/voices')).json()).voices;

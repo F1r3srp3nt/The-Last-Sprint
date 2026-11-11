@@ -6,14 +6,20 @@
 import { defaultPlacement, IMAGE_LAYOUTS, newSlide, type Asset, type Brief, type LayoutId, type Slide } from './model';
 import type { OutlineSlide, SlideContent } from './generationSchemas';
 import { toParagraphs } from './textFit';
+import { uniqueMessages } from './util';
 
-export function slideFromContent(content: SlideContent, id: string, previous?: Slide): Slide {
+/**
+ * Builds a slide from generated content. Flags are deduplicated, and flags that repeat the
+ * deck-level "missing information" list are dropped (that list is shown once for the deck).
+ */
+export function slideFromContent(content: SlideContent, id: string, previous?: Slide, deckMissingInfo: readonly string[] = []): Slide {
   const image = content.imageId && IMAGE_LAYOUTS.has(content.layout)
     ? previous?.image && previous.image.assetId === content.imageId
       ? previous.image
       : defaultPlacement(content.imageId, content.layout)
     : null;
   return newSlide(id, content.layout, 'ai', {
+    kicker: content.kicker,
     title: content.title,
     body: content.body,
     caption: content.caption,
@@ -23,7 +29,7 @@ export function slideFromContent(content: SlideContent, id: string, previous?: S
     rightBody: content.rightBody,
     image,
     notes: content.notes,
-    flags: content.flags,
+    flags: uniqueMessages(content.flags, deckMissingInfo),
     narration: null,
   });
 }

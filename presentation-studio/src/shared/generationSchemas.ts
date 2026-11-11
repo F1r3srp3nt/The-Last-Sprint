@@ -5,7 +5,9 @@
  * unused) so the shapes stay compatible with structured outputs.
  */
 import { z } from 'zod';
-import { IMAGE_LAYOUTS, LAYOUT_IDS } from './model';
+import { IMAGE_LAYOUTS, IMAGE_REQUIRED_LAYOUTS, LAYOUT_IDS, LAYOUT_LABELS, type LayoutId } from './model';
+import { parseItems } from './items';
+import { toParagraphs } from './textFit';
 
 export const OutlineSlideSchema = z.object({
   layout: z.enum(LAYOUT_IDS),
@@ -34,6 +36,8 @@ export type ImageNote = z.infer<typeof ImageNoteSchema>;
 
 export const SlideContentSchema = z.object({
   layout: z.enum(LAYOUT_IDS),
+  /** Short eyebrow label above the title, or "". */
+  kicker: z.string(),
   title: z.string(),
   body: z.string(),
   caption: z.string(),
@@ -70,14 +74,18 @@ export function validateOutline(
   if (outline.slides.length === 0) errors.push('The outline has no slides.');
   if (outline.slides.length > 30) errors.push('The outline has more than 30 slides.');
   if (outline.slides.length !== opts.slideCount && outline.slides.length > 0) {
-    notices.push(`You asked for ${opts.slideCount} slides; the outline has ${outline.slides.length}.`);
+    notices.push(`The slide count is ${opts.slideCount}, but the planned outline has ${outline.slides.length} slides.`);
   }
   const known = new Set(opts.assetIds);
-  for (const s of outline.slides) {
+  for (const [i, s] of outline.slides.entries()) {
     const unknown = s.imageIds.filter((id) => !known.has(id));
     if (unknown.length) {
       notices.push(`Removed unknown image references from "${s.title}".`);
       s.imageIds = s.imageIds.filter((id) => known.has(id));
+    }
+    if (IMAGE_REQUIRED_LAYOUTS.has(s.layout) && s.imageIds.length === 0) {
+      notices.push(`Slide ${i + 1} was planned as "${LAYOUT_LABELS[s.layout]}" without an image; it will be a text slide.`);
+      s.layout = 'bullets';
     }
   }
   outline.imageNotes = outline.imageNotes.filter((n) => known.has(n.imageId));
@@ -91,7 +99,24 @@ export function validateOutline(
     if (!IMAGE_LAYOUTS.has(target.layout)) target.layout = 'textImage';
     notices.push(`Placed an image on slide ${slideNo} as you requested.`);
   }
-  return { ok: errors.length === 0, value: errors.length ? null : outline, errors, notices };
+  return { ok: errors.length === 0, value: errors.length ? null : outline, errors, notices: [...new Set(notices)] };
+}
+
+/**
+ * Makes a slide's layout fit what it actually contains, without changing any text:
+ * image layouts without an image become text layouts, and cards or workflows that are
+ * not one item per line fall back to key points. Returns the layout and a notice, if changed.
+ */
+export function fitLayoutToContent(c: Pick<SlideContent, 'layout' | 'body' | 'imageId'>): { layout: LayoutId; notice: string | null } {
+  const lines = toParagraphs(c.body);
+  if (IMAGE_REQUIRED_LAYOUTS.has(c.layout) && !c.imageId) {
+    return { layout: lines.length ? 'bullets' : 'takeaway', notice: `"${LAYOUT_LABELS[c.layout]}" needs an image; shown as a text slide instead.` };
+  }
+  if (c.layout === 'textImage' && !c.imageId) return { layout: 'bullets', notice: null };
+  if ((c.layout === 'cards' || c.layout === 'process') && (lines.length < 2 || parseItems(c.body).length > 6)) {
+    return { layout: 'bullets', notice: `"${LAYOUT_LABELS[c.layout]}" needs 2–6 lines; shown as key points instead.` };
+  }
+  return { layout: c.layout, notice: null };
 }
 
 export function validateSlideContent(raw: unknown, opts: { assetIds: string[] }): ValidationResult<SlideContent> {
@@ -104,6 +129,11 @@ export function validateSlideContent(raw: unknown, opts: { assetIds: string[] })
   if (content.imageId && !opts.assetIds.includes(content.imageId)) {
     notices.push('Removed a reference to an unknown image.');
     content.imageId = '';
+  }
+  const fitted = fitLayoutToContent(content);
+  if (fitted.layout !== content.layout) {
+    content.layout = fitted.layout;
+    if (fitted.notice) notices.push(fitted.notice);
   }
   return { ok: true, value: content, errors: [], notices };
 }

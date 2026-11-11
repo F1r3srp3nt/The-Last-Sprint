@@ -22,6 +22,8 @@ export interface FitInput {
   lineHeight?: number;
   /** Space after each paragraph, as a fraction of the font size. */
   paraSpace?: number;
+  /** Extra space between characters, in points (letter spacing). */
+  charSpacing?: number;
 }
 
 export interface FitResult {
@@ -73,7 +75,7 @@ export function measureHeightPt(input: FitInput, size: number): { heightPt: numb
   const paraSpace = input.paraSpace ?? PARA_SPACE;
   const indent = input.bullets ? BULLET_INDENT_PT : 0;
   const widthPt = input.boxW * 72 * WIDTH_SAFETY - indent;
-  const charPt = size * input.widthFactor * (input.bold ? 1.07 : 1);
+  const charPt = size * input.widthFactor * (input.bold ? 1.07 : 1) + (input.charSpacing ?? 0);
   let lines = 0;
   for (const p of input.paragraphs) lines += countWrappedLines(p, widthPt, charPt);
   const paras = Math.max(0, input.paragraphs.length - 1);

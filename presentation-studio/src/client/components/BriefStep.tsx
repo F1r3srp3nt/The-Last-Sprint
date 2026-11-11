@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import type { ProviderStatus } from '../../shared/apiTypes';
+import { conflictKey, parseSlideCount, slideCountConflict } from '../../shared/briefCheck';
 import { buildTemplateDeck } from '../../shared/deckBuild';
+import { applyRestyle, planRestyle } from '../../shared/restyle';
 import { THEME_IDS } from '../../shared/model';
 import { THEMES } from '../../shared/themes';
 import { newId } from '../../shared/util';
-import type { GenerationApi } from '../generation';
+import { resumeInfo, type GenerationApi } from '../generation';
 import { useStudio } from '../state';
 import { SpokenBrief } from './SpokenBrief';
 import { ThemeSwatch } from './ThemeSwatch';
@@ -29,16 +32,37 @@ export function BriefStep({
   const running = ['preparing', 'outline', 'slides'].includes(gen.state.phase);
   const canGenerate = (b.topic.trim() || b.brief.trim()).length > 0;
 
+  // The slide count is edited as text so that clearing the box to type a new number does not
+  // snap it to 1 (which turned "3" into "13"). Only valid numbers are saved.
+  const [countText, setCountText] = useState(String(b.slideCount));
+  // Follow changes made elsewhere (the conflict buttons, opening a project) in the same render.
+  const [syncedCount, setSyncedCount] = useState(b.slideCount);
+  if (syncedCount !== b.slideCount) {
+    setSyncedCount(b.slideCount);
+    setCountText(String(b.slideCount));
+  }
+
+  // Conflicts between the slide-count field and the brief must be resolved before any paid request.
+  const conflict = slideCountConflict(b);
+  const [keptKey, setKeptKey] = useState<string | null>(null);
+  const unresolved = conflict !== null && conflictKey(conflict) !== keptKey;
+
+  const resumable = running ? null : resumeInfo(project);
+  const canResume = Boolean(resumable && resumable.pendingCount > 0);
+
   const confirmReplace = () =>
     project.slides.length === 0 || confirm(`This replaces the ${project.slides.length} slide(s) in the editor. Images stay in the project. Continue?`);
 
   function buildTemplate() {
     if (!confirmReplace()) return;
-    const slides = buildTemplateDeck(b, project.assets, () => newId('slide'));
+    if (unresolved) return;
+    const built = buildTemplateDeck(b, project.assets, () => newId('slide'));
+    // Same layout rules as "Restyle deck": cards or a workflow when the points have that shape.
+    const slides = applyRestyle(built, planRestyle(built));
     update((d) => {
       d.slides = slides;
       d.title = b.topic.trim() || d.title;
-      d.generation = { mode: 'template', provider: null, model: null, generatedAt: new Date().toISOString(), missingInfo: [] };
+      d.generation = { mode: 'template', provider: null, model: null, generatedAt: new Date().toISOString(), missingInfo: [], resume: null };
     });
     select(slides[0]?.id ?? null);
     toast('info', `Template deck with ${slides.length} slides created. No AI was used.`);
@@ -46,8 +70,20 @@ export function BriefStep({
   }
 
   async function generate() {
-    if (!confirmReplace()) return;
+    if (unresolved) {
+      toast('error', 'Resolve the slide count first: the brief and the slide-count field disagree.');
+      return;
+    }
+    const regenerating = resumeInfo(project) !== null;
+    if (regenerating) {
+      if (!confirm('This deck was already generated from this brief. Starting over sends new paid requests for the outline and for every slide, and replaces the current slides. Continue?')) return;
+    } else if (!confirmReplace()) return;
     await gen.start();
+  }
+
+  async function continueGeneration() {
+    if (unresolved) return;
+    await gen.resume();
   }
 
   const jobs = gen.state.jobs;
@@ -95,7 +131,20 @@ export function BriefStep({
             </label>
             <label className="field">
               <span>Number of slides</span>
-              <input type="number" min={1} max={30} value={b.slideCount} onChange={(e) => set('slideCount', Math.max(1, Math.min(30, Number(e.target.value) || 1)))} data-testid="slide-count" />
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={countText}
+                onChange={(e) => {
+                  setCountText(e.target.value);
+                  const n = parseSlideCount(e.target.value);
+                  if (n !== null) set('slideCount', n);
+                }}
+                onBlur={() => setCountText(String(b.slideCount))}
+                aria-invalid={parseSlideCount(countText) === null}
+                data-testid="slide-count"
+              />
             </label>
             <label className="field">
               <span>Tone</span>
@@ -162,11 +211,39 @@ export function BriefStep({
                 . Template mode below works without AI.
               </div>
             )}
+            {conflict && unresolved && (
+              <div className="alert warn" role="alert" data-testid="slide-count-conflict">
+                <b>The brief and the slide count disagree.</b> The brief says “{conflict.example}”, but the slide count is {conflict.field}. Choose one before
+                generating; nothing has been sent.
+                <div className="row gap-s wrap" style={{ marginTop: 8 }}>
+                  {conflict.mentioned.filter((n) => n !== conflict.field).map((n) => (
+                    <button key={n} className="btn small primary" onClick={() => set('slideCount', n)} data-testid={`use-count-${n}`}>
+                      Use {n} slide{n === 1 ? '' : 's'}
+                    </button>
+                  ))}
+                  <button className="btn small" onClick={() => setKeptKey(conflictKey(conflict))} data-testid="keep-count">
+                    Keep {conflict.field}
+                  </button>
+                </div>
+              </div>
+            )}
+            {canResume && resumable && (
+              <div className="notice" data-testid="resume-notice">
+                An earlier run already planned this deck and wrote {resumable.entries.length - resumable.pendingCount} of {resumable.entries.length} slides.{' '}
+                <b>Continue</b> writes only the {resumable.pendingCount} remaining slide{resumable.pendingCount === 1 ? '' : 's'}; the outline and finished slides are
+                reused and not paid for again.
+              </div>
+            )}
             <div className="row gap-s wrap">
-              <button className="btn primary" disabled={!aiReady || running || !canGenerate} onClick={generate} data-testid="generate-ai">
-                {running ? 'Generating…' : 'Send to Anthropic and generate'}
+              {canResume && resumable && (
+                <button className="btn primary" disabled={!aiReady || running || unresolved} onClick={continueGeneration} data-testid="generate-resume">
+                  Continue: write {resumable.pendingCount} remaining slide{resumable.pendingCount === 1 ? '' : 's'}
+                </button>
+              )}
+              <button className={`btn ${canResume ? '' : 'primary'}`} disabled={!aiReady || running || !canGenerate || unresolved} onClick={generate} data-testid="generate-ai">
+                {running ? 'Generating…' : canResume ? 'Start over (new outline)' : 'Send to Anthropic and generate'}
               </button>
-              <button className="btn" disabled={running || !canGenerate} onClick={buildTemplate} data-testid="generate-template">
+              <button className="btn" disabled={running || !canGenerate || unresolved} onClick={buildTemplate} data-testid="generate-template">
                 Build from template (no AI)
               </button>
             </div>

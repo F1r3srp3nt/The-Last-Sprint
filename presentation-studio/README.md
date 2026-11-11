@@ -81,15 +81,36 @@ Then open http://127.0.0.1:8787.
 ## How it works
 
 1. **Images.** Drag and drop PNG, JPEG or WebP images (several at once). Reorder them, remove them, add captions, and pin an image to a slide number or leave the placement to the generator. Originals are stored byte-for-byte and are never stretched.
-2. **Brief.** Fill in the topic, brief and key points, audience, language, slide count and tone, and choose whether to write speaker notes. Pick one of three deck themes. You can also record the brief (see [Spoken brief](#spoken-brief)).
+2. **Brief.** Fill in the topic, brief and key points, audience, language, slide count and tone, and choose whether to write speaker notes. Pick one of three deck themes. You can also record the brief (see [Spoken brief](#spoken-brief)). If the brief mentions a slide count that differs from the slide-count field ("Make 3 slides" with 13 in the field), a warning appears and both **Generate** buttons stay disabled until you choose **Use N slides** or **Keep M**. Nothing is sent before that. Counts are recognised as digits and as English, Norwegian and Polish number words.
 3. **Create the deck**, in one of two modes:
-   - **AI generation.** A notice first says exactly what goes to the provider. Generation then plans an outline, then writes each slide, with per-slide progress, retry and stop controls.
+   - **AI generation.** A notice first says exactly what goes to the provider. Generation then plans an outline, then writes each slide, with per-slide progress, retry and stop controls. The outline and every finished slide are kept in the project. If a run stops or some slides fail, **Continue: write N remaining slides** writes only the missing ones from the saved outline, with no new outline request. This also works after saving and reopening the project. It is offered only while the brief and images are unchanged.
    - **Template mode (no AI).** This mode arranges your own points and images into slides. It never writes new content. Each slide is labelled **Template** and the deck shows a "without AI" banner.
-4. **Edit.** On the left are slide thumbnails (select, drag or arrow to reorder, duplicate, delete, add). In the centre is the 16:9 preview. On the right you edit the layout, text, image (fit or fill, zoom and crop position), speaker notes and narration, or rewrite this one slide with AI.
+4. **Edit.** On the left are slide thumbnails (select, drag or arrow to reorder, duplicate, delete, add). In the centre is the 16:9 preview. On the right you edit the layout, text, image (fit or fill, zoom and crop position), speaker notes and narration, or rewrite this one slide with AI. **Restyle…** changes the deck's theme and, optionally, chooses a layout for each slide from its own content. It makes no AI call. Text, speaker notes, images and narration are not changed, and **Undo restyle** puts the previous theme and layouts back.
 5. **Export** an editable `.pptx`, or `.pptx` + narration as a ZIP. **Save** writes a `.pstudio` project file, and **Open** reopens it.
 
-Layouts: title, image with caption, text + image, full image, comparison, key takeaway, closing.
-Deck themes: clean light, executive dark, futuristic cyan. They are kept separate from the midnight-navy and cyan app interface.
+### Layouts and themes
+
+| Layout | What it shows |
+|---|---|
+| Title | Eyebrow label, large title and subtitle, with a theme graphic |
+| Key points (text only) | Numbered rows; "Label — detail" lines get a bold label |
+| Feature cards | 2–6 parallel "Label — detail" items as cards (one row, 2×2 or 3×2) |
+| Workflow / steps | 2–6 steps in order as connected numbered nodes |
+| Text + image | Points next to one of your images. Without an image it is drawn as a text slide, not with an empty frame |
+| Image with caption, Full image | One of your images, never stretched |
+| Comparison | Two headed columns |
+| Key takeaway | One statement |
+| Closing | Title plus up to five numbered next steps or contact lines |
+
+Every layout except full image has an optional short **eyebrow** label above the title. All text stays in editable text boxes. Graphics (lines, cards, nodes, corner brackets) are native PowerPoint shapes. They are drawn from the same element list in the preview and the export.
+
+Deck themes are **Clean Light**, **Executive Dark** and **Futuristic Cyan**. Each has its own composition rules, not only colours. **Futuristic Cyan** uses a near-black navy background, a monospace eyebrow with wide letter spacing, corner brackets, a dot grid, hexagon workflow nodes, thin cyan rules and a "01 / 03" footer. Clean Light uses rounded cards, filled circles and an accent bar. Executive Dark uses a serif title, a gold hairline frame and outline circles. All three are separate from the midnight-navy and cyan app interface.
+
+**There is no image generation.** Images come only from your uploads. The AI is told never to plan an image layout for a slide without one of your images, and the server turns any such slide into a text layout.
+
+![The synthetic three-slide deck: previous renderer, new renderer with the same layouts, and after "Restyle deck"](docs/screenshots/design-before-after.png)
+
+![The same deck in the three themes](docs/screenshots/design-themes.png)
 
 ## Configuration
 
@@ -118,6 +139,8 @@ Restart the server after changing `.env`. The **AI / Voice** pill in the top bar
 - **Images:** the browser sends a downscaled JPEG copy (max 1568 px on the long edge) of each image. The original upload is never modified.
 - **Trust boundary:** the brief is the only source of instructions. Images, captions, file names and any text inside images are wrapped as *source material*, and the model is told not to follow instructions found there. `samples/poster-with-embedded-instruction.png` is a test image for this.
 - **No invented facts:** the prompts forbid invented facts, statistics, sources and quotations. Gaps are returned as **flags**, which the editor shows per slide ("Flagged for your attention").
+- **Layouts chosen by the AI:** the outline prompt describes each supported layout and when to use it (cards for parallel items, workflow for steps in order, text-only layouts when no image fits), asks for "Label — detail" lines and a short eyebrow, and says the slide-count field is final. After generation, a layout that does not fit the content is corrected (for example, cards with one item become key points). The slide still uses only supported layouts and editable text.
+- **No duplicate warnings:** the outline is validated on the server and again in the browser, and both notice lists, the deck's "missing information" list and each slide's flags are merged without repeating the same message.
 - **Validation:** the server validates the model's JSON (schema, layouts, image references, counts), and the browser validates it again before rendering. Invalid output, refusals, truncation, rate limits, network errors and authentication problems each produce a specific message and, where useful, a **Retry** button.
 - **Rewrite one slide:** in the editor, *Rewrite this slide with AI* (with an optional instruction) replaces only that slide's text.
 
@@ -127,9 +150,11 @@ Restart the server after changing `.env`. The **AI / Voice** pill in the top bar
 - **Same layout as the preview:** `src/shared/render.ts` turns each slide into positioned elements (inches, points). The React preview and the exporter draw those same elements. Font sizes are chosen once by a shared, deliberately conservative text-fit estimate (`src/shared/textFit.ts`).
 - **Images are never stretched.** *Fit* shows the whole image. *Fill* covers the frame and is written as a native PowerPoint crop (`srcRect`), so you can still adjust it in PowerPoint. PNG and JPEG are embedded unchanged. WebP is converted to PNG (lossless) for compatibility with older PowerPoint versions, and the project file keeps the original WebP.
 - **Overflow:** text that does not fit even at the minimum size produces a warning on the slide, a ⚠ badge on its thumbnail, and a confirmation before export.
-- Fonts are Arial, Georgia and Trebuchet MS. PowerPoint substitutes them if they are not installed.
+- Fonts are Arial, Georgia, Trebuchet MS and Courier New. PowerPoint substitutes them if they are not installed. In the LibreOffice render below, the container lacks Trebuchet MS and Courier New, so some lines break in different places.
 
-![Browser preview (left) vs. the exported .pptx rendered by LibreOffice (right); synthetic sample](docs/screenshots/preview-vs-pptx.png)
+![App preview (left) vs. the exported .pptx rendered by LibreOffice (right); synthetic three-slide deck](docs/screenshots/preview-vs-pptx.png)
+
+To render the synthetic deck yourself without any provider: `npx tsx scripts/render-sample-deck.ts --restyle`. It builds the app, starts the server with no keys, opens `samples/three-slide-deck.json` as a project, screenshots each slide, applies **Restyle deck**, and exports the `.pptx` to `test-output/sample-deck/`.
 
 ## Project files (`.pstudio`)
 
@@ -181,22 +206,24 @@ Authentication uses the `xi-api-key` header. Sources: [authentication](https://e
 
 **Tested in this repository (Linux, Node 22, Chromium 1.63 via Playwright, LibreOffice):**
 
-- `npm test` runs 45 unit and API tests: layout bounds, text fit and overflow, fit/fill/crop geometry, template mode, outline validation, narration outdated detection, project round-trip (byte-identical images and audio), `.pptx` structure (slide size, text boxes, bullets, notes, unstretched images, crop), narration ZIP and mapping, every server route against **mock** Anthropic and ElevenLabs servers, ElevenLabs error mapping, and that keys are not logged.
-- `npm run test:e2e` runs 25 browser steps in two runs. **Run A** has no providers. It uploads PNG, JPEG and WebP images, then reorders, captions and removes images. It builds a template deck; edits text, notes, layout, fill, zoom and crop; adds, duplicates, deletes and reorders slides; checks the overflow warning; saves the project and reopens it in a fresh page; and exports a `.pptx`, which is checked with python-pptx and converted by LibreOffice. **Run B** uses **mock** providers. It checks "key configured" against "connection verified"; records a spoken brief through Chromium's fake microphone, then transcribes, edits and uses it; checks the AI disclosure, generation and progress; regenerates one slide; chooses and previews a voice; narrates after confirmation; checks outdated detection; checks the unavailable-voice error; narrates the whole deck; checks presentation mode playback, pause and navigation; checks the ZIP export; and checks that the keys appear nowhere in the browser, storage, files or logs.
+- `npm test` runs 78 unit and API tests. They include slide-count detection and conflicts, warning deduplication, item parsing, every layout × theme without overflow, the workflow and card shapes, Futuristic Cyan's distinct styling, the closing slide, native shapes and letter spacing in the `.pptx`, restyle keeping text/notes/narration, resuming a partial generation, and loading older project files. They also cover: layout bounds, text fit and overflow, fit/fill/crop geometry, template mode, outline validation, narration outdated detection, project round-trip (byte-identical images and audio), `.pptx` structure (slide size, text boxes, bullets, notes, unstretched images, crop), narration ZIP and mapping, every server route against **mock** Anthropic and ElevenLabs servers, ElevenLabs error mapping, and that keys are not logged.
+- `npm run test:e2e` runs 27 browser steps in two runs. **Run A** has no providers. It uploads PNG, JPEG and WebP images, then reorders, captions and removes images. It checks that typing a slide count replaces the value and that a count in the brief blocks generation until resolved. It builds a template deck; edits text, notes, layout, fill, zoom and crop; adds, duplicates, deletes and reorders slides; checks the overflow warning; saves the project and reopens it in a fresh page; restyles the deck and undoes it; and exports a `.pptx`, which is checked with python-pptx and converted by LibreOffice. **Run B** uses **mock** providers. It checks "key configured" against "connection verified"; records a spoken brief through Chromium's fake microphone, then transcribes, edits and uses it; checks that no request is sent while the slide count is in conflict; checks the AI disclosure, generation and progress; regenerates one slide; chooses and previews a voice; narrates after confirmation; checks outdated detection; checks the unavailable-voice error; narrates the whole deck; checks presentation mode playback, pause and navigation; checks the ZIP export; and checks that the keys appear nowhere in the browser, storage, files or logs.
 - Exported decks open in **python-pptx 1.0.2** and convert in **LibreOffice**, and the preview and the LibreOffice render match (screenshot above).
 
 **CI:** [`.github/workflows/presentation-studio.yml`](../.github/workflows/presentation-studio.yml) runs on every pull request and push to `main` that touches `presentation-studio/`. One job runs the secret check, type-check, unit/API tests and build. A second job runs the browser end-to-end test with Chromium, python-pptx and LibreOffice, and uploads the screenshots and exported files as an artifact. CI uses only the mock providers: it has no keys and makes no paid calls.
 
 **Not verified:**
 
-- **Real Anthropic and ElevenLabs calls.** No real keys were available, so all provider traffic was tested against local mock servers that follow the documented request and response shapes. Model output quality, real prompt-injection resistance, real error bodies, and the exact permission names in the ElevenLabs key dashboard have not been checked.
+- **Real Anthropic and ElevenLabs calls.** No real keys were available, so all provider traffic was tested against local mock servers that follow the documented request and response shapes. Model output quality (including how well the model picks layouts and writes "Label — detail" lines), real prompt-injection resistance, real error bodies, and the exact permission names in the ElevenLabs key dashboard have not been checked.
 - **Microsoft PowerPoint and Keynote.** The `.pptx` has only been opened with python-pptx and LibreOffice. Font metrics in PowerPoint can differ slightly from the preview.
 - Real microphones, Safari and Firefox recording formats, and browsers other than Chromium.
 - Very large decks or images (performance), and accessibility with a screen reader.
+- The **Continue** (resume) button is covered by unit tests of the resume logic, not by an end-to-end run with a failed slide.
+- The editor, setup and narration screenshots at the top of this README were captured before the new slide designs.
 
 ## Limitations
 
-- A single user on one machine: there are no accounts, no autosave and no undo. Save the project with **Save** (the app warns before you close a tab with unsaved changes).
+- A single user on one machine: there are no accounts, no autosave and no general undo (only **Undo restyle**). Save the project with **Save** (the app warns before you close a tab with unsaved changes).
 - Text fitting is an estimate shared by the preview and the export. It errs toward smaller text, but unusual fonts or scripts can still wrap differently in PowerPoint.
 - Template mode is deliberately simple: one point per slide title, with images spread over the middle slides.
 - The server listens on `127.0.0.1` only and has no authentication. Do not expose it to a network.
@@ -212,8 +239,8 @@ presentation-studio/
   src/client/        React app (steps, editor, dialogs, presentation mode)
   tests/             Vitest unit and API tests (+ fixtures)
   e2e/               Playwright end-to-end test and mock providers
-  samples/           Synthetic sample images (labelled "SYNTHETIC SAMPLE")
-  scripts/           Sample generator, python-pptx inspector
+  samples/           Synthetic sample images (labelled "SYNTHETIC SAMPLE") and the three-slide sample deck
+  scripts/           Sample generator, python-pptx inspector, sample-deck renderer
   docs/screenshots/  Screenshots from the e2e run (synthetic/mock content)
 ```
 
